@@ -1,12 +1,18 @@
 package frame
 
-import "github.com/gin-gonic/gin"
+import (
+	"io/ioutil"
 
+	"github.com/gin-gonic/gin"
+)
+
+// Default engin
 func Default() *Engine {
+	// 关闭Gin的日志输出
+	gin.DefaultWriter = ioutil.Discard
 	e := &Engine{
 		Engine: defaultEngine(),
-		Level:  1,
-		// log: nil,
+		Level:  "INFO",
 	}
 	return e
 
@@ -14,11 +20,13 @@ func Default() *Engine {
 
 func defaultEngine() *gin.Engine {
 	r := gin.Default()
-	r.Use(RequestID())
+	r.Use(TraceFunc())
+	r.Use(LoggerFunc())
 	return r
 }
 
+// Engine frame engine
 type Engine struct {
 	*gin.Engine
-	Level int
+	Level string
 }

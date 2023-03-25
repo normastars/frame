@@ -2,6 +2,7 @@ package frame
 
 import (
 	"bytes"
+	"encoding/json"
 	"io/ioutil"
 	"strings"
 	"time"
@@ -10,7 +11,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func Logger() gin.HandlerFunc {
+// LoggerFunc log func
+func LoggerFunc() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 记录请求开始时间
 		startTime := time.Now()
@@ -44,15 +46,25 @@ func Logger() gin.HandlerFunc {
 		endTime := time.Now()
 
 		// 日志记录
-		log.WithFields(log.Fields{
-			"requestId":   c.Request.Header.Get("X-Request-ID"),
-			"requestUrl":  c.Request.URL.Path,
-			"requestBody": requestBody,
-			"requestHdr":  requestHeader,
-			"statusCode":  c.Writer.Status(),
-			"response":    w.body.String(),
-			"latency":     endTime.Sub(startTime),
-		}).Info("HTTP request completed")
+		reqLog := logBody{
+			RequestID:  c.Request.Header.Get(TraceID),
+			Code:       "X001",
+			StatusCode: c.Writer.Status(),
+			Latency:    endTime.Sub(startTime).Microseconds(),
+			Msg:        "XTODO",
+			Path:       c.Request.URL.Path,
+			Extra: reqLogExtra{
+				Req: reqLogBody{
+					// Header: requestHeader,
+					Body: requestBody,
+				},
+				Resp: respLogBody{
+					Body: w.body.String(),
+				},
+			},
+		}
+		byts, _ := json.Marshal(reqLog)
+		log.Infoln(string(byts))
 	}
 }
 
@@ -64,4 +76,30 @@ type responseWriter struct {
 func (w responseWriter) Write(b []byte) (int, error) {
 	w.body.Write(b)
 	return w.ResponseWriter.Write(b)
+}
+
+type logBody struct {
+	RequestID  string      `json:"request_id,omitempty"`
+	Code       string      `json:"code,omitempty"`
+	StatusCode int         `json:"statusCode,omitempty"`
+	Latency    int64       `json:"latency,omitempty"` // ms
+	Msg        string      `json:"msg,omitempty"`
+	Path       string      `json:"path,omitempty"`
+	Extra      reqLogExtra `json:"extra,omitempty"`
+}
+
+type reqLogExtra struct {
+	Req  reqLogBody  `json:"req,omitempty"`
+	Resp respLogBody `json:"resp,omitempty"`
+}
+
+type reqLogBody struct {
+	Header interface{} `json:"header,omitempty"`
+	// Param  map[string]interface{} `json:"param,omitempty"`
+	Body string `json:"body,omitempty"`
+}
+
+type respLogBody struct {
+	Header interface{} `json:"header,omitempty"`
+	Body   string      `json:"body,omitempty"`
 }
