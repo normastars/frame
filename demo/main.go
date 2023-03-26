@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 
-	"github.com/gin-gonic/gin"
 	"github.com/nomainc/frame"
 	"github.com/nomainc/frame/version"
 	"github.com/sirupsen/logrus"
@@ -17,9 +16,7 @@ func main() {
 	router.GET("/hello", func(c *frame.Context) {
 		logrus.Info("哈哈")
 		logrus.Infof("hello world %s", "v")
-		c.JSON(200, gin.H{
-			"message": "Hello, World!",
-		})
+		c.Success(nil)
 	})
 
 	router.Run(":8080")

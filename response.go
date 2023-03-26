@@ -1,11 +1,8 @@
 package frame
 
 import (
-	"fmt"
 	"net/http"
 	"time"
-
-	"github.com/gin-gonic/gin"
 )
 
 // Response http response data
@@ -33,15 +30,15 @@ var (
 )
 
 // Success http response 响应成功时使用
-func (eng *Engine) Success(ctx *gin.Context, data interface{}) {
+// default json
+func (ctx *Context) Success(data interface{}) {
 	resp := &Response{
 		Code:    successCode,
 		Message: successMsg,
 		Data:    data,
 		Time:    time.Now(),
 	}
-	fmt.Println(resp)
-
+	ctx.JSON(200, resp)
 }
 
 // ErrorMsg frame err msg
@@ -56,7 +53,7 @@ type ErrorMsg interface {
 
 // Error http response error msg
 // default json
-func (eng *Engine) Error(ctx *gin.Context, errMsg ErrorMsg) {
+func (ctx *Context) Error(errMsg ErrorMsg) {
 	resp := &Response{
 		Code:    errMsg.GetCode(),
 		Message: errMsg.GetReply(),
@@ -67,10 +64,23 @@ func (eng *Engine) Error(ctx *gin.Context, errMsg ErrorMsg) {
 	ctx.JSON(http.StatusOK, resp)
 }
 
+// HTTPError http response error msg and setting http code
+// default json
+func (ctx *Context) HTTPError(httpCode int, errMsg ErrorMsg) {
+	resp := &Response{
+		Code:    errMsg.GetCode(),
+		Message: errMsg.GetReply(),
+		Data:    nil,
+		Time:    time.Now(),
+	}
+	// TODO: 打印真正的错误原因
+	ctx.JSON(httpCode, resp)
+}
+
 // ListSuccess 如果 pageData 是nil 或者 pageData.Results 是空,自动设置为空数组[]
 // http response 结果集是数组或切片时使用
 // default json
-func (eng *Engine) ListSuccess(ctx *gin.Context, pageData *PageResults) {
+func (ctx *Context) ListSuccess(pageData *PageResults) {
 	emptyPage(pageData)
 	resp := &Response{
 		Code:    successCode,
@@ -84,7 +94,7 @@ func (eng *Engine) ListSuccess(ctx *gin.Context, pageData *PageResults) {
 // ListError 自动将结果集设置为空数组
 // http response 结果集是数组或切片时使用
 // default json
-func (eng *Engine) ListError(ctx *gin.Context, errMsg ErrorMsg) {
+func (ctx *Context) ListError(errMsg ErrorMsg) {
 	resp := &Response{
 		Code:    errMsg.GetCode(),
 		Message: errMsg.GetReply(),
@@ -93,6 +103,20 @@ func (eng *Engine) ListError(ctx *gin.Context, errMsg ErrorMsg) {
 	}
 	// TODO: 打印真实的错误信息
 	ctx.JSON(http.StatusOK, resp)
+}
+
+// HTTPListError 自动将结果集设置为空数组
+// http response 结果集是数组或切片时使用
+// default json
+func (ctx *Context) HTTPListError(httpCode int, errMsg ErrorMsg) {
+	resp := &Response{
+		Code:    errMsg.GetCode(),
+		Message: errMsg.GetReply(),
+		Data:    defaultEmptyPage,
+		Time:    time.Now(),
+	}
+	// TODO: 打印真实的错误信息
+	ctx.JSON(httpCode, resp)
 }
 
 func emptyPage(pageData *PageResults) {

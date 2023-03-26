@@ -10,10 +10,10 @@ import (
 )
 
 // TODO LIST:
-// 1. gin.Context -> frame.Context
+// 1. gin.Context -> frame.Context 完成
+// 4. 跑通demo  完成
 // 2. 集成 Config
 // 3. 优化 Redis,Mysql 连接,日志打印
-// 4. 跑通demo
 // 5. 集成 req 请求
 // 6. 优化 Log 包
 
@@ -25,6 +25,7 @@ type Engine struct {
 }
 
 // Run engin run
+// ":8080"
 func (e *Engine) Run(addr string) error {
 	return e.Engine.Run(addr)
 }
@@ -91,6 +92,38 @@ func (e *Engine) GET(relativePath string, handler func(c *Context)) {
 // POST post method
 func (e *Engine) POST(relativePath string, handler func(c *Context)) {
 	e.Engine.POST(relativePath, func(c *gin.Context) {
+		ctx := e.createContext(c)
+		handler(ctx)
+	})
+}
+
+// PUT http put method
+func (e *Engine) PUT(relativePath string, handler func(c *Context)) {
+	e.Engine.PUT(relativePath, func(c *gin.Context) {
+		ctx := e.createContext(c)
+		handler(ctx)
+	})
+}
+
+// PATCH  http patch method
+func (e *Engine) PATCH(relativePath string, handler func(c *Context)) {
+	e.Engine.PATCH(relativePath, func(c *gin.Context) {
+		ctx := e.createContext(c)
+		handler(ctx)
+	})
+}
+
+// DELETE http delete method
+func (e *Engine) DELETE(relativePath string, handler func(c *Context)) {
+	e.Engine.DELETE(relativePath, func(c *gin.Context) {
+		ctx := e.createContext(c)
+		handler(ctx)
+	})
+}
+
+// HEAD http head method
+func (e *Engine) HEAD(relativePath string, handler func(c *Context)) {
+	e.Engine.HEAD(relativePath, func(c *gin.Context) {
 		ctx := e.createContext(c)
 		handler(ctx)
 	})

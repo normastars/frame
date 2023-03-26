@@ -82,6 +82,8 @@ func LoggerFunc() gin.HandlerFunc {
 			},
 		}
 		byts, _ := json.Marshal(reqLog)
+
+		log.Errorln("richardyu")
 		log.Infoln(string(byts))
 	}
 }
