@@ -1,24 +1,44 @@
 {
     "project":"nomainc",
-    "level":"INFO",
-    "metric":true,
-    "mysql":[
-        {
-            "default":true,
-            "database":"user",
-            "user":"user",
-            "password":"pwd",
-            "host":"127.0.0.1:3306"
-        }
-    ],
-    "redis":[
-        {
-            "host":"127.0.0.1:3306",
-            "name":"common",
-            "default":true,
-            "auth":"xxx"
-        }
-
-
-    ]
+    "level":"info",
+    "enable_metrics":true,
+    "env":"dev",
+    "http_server":{
+        "enable":true,
+        "configs":[
+           {
+            "name":"server",
+            "port":":8080"
+           },
+           {
+            "name":"metrics",
+            "port":":9090"
+           } 
+        ]
+    },
+    "mysql":{
+        "enable":true,
+        "configs":[
+            {
+                "name":"xxx",
+                "default":true,
+                "host":"127.0.0.1:3306",
+                "database":"user",
+                "user":"user",
+                "password":"pwd"
+            }
+        ]
+    },
+    "redis":{
+        "enable": true,
+        "configs":[
+            {
+                "name":"common",
+                "default":true,
+                "host":"127.0.0.1:3306",
+                "password":"xxx",
+                "db":0
+            }
+        ]
+    }
 }
