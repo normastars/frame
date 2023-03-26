@@ -8,8 +8,26 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
+
+type Hook struct {
+	TraceID string
+}
+
+func NewHook(trace_id string) *Hook {
+	return &Hook{TraceID: trace_id}
+}
+
+func (h *Hook) Levels() []logrus.Level {
+	return logrus.AllLevels
+}
+
+func (h *Hook) Fire(entry *logrus.Entry) error {
+	entry.Data[TraceID] = h.TraceID
+	return nil
+}
 
 // LoggerFunc log func
 func LoggerFunc() gin.HandlerFunc {

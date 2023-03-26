@@ -1,16 +1,13 @@
 package frame
 
 import (
-	"path"
-	"runtime"
-
 	"github.com/sirupsen/logrus"
 )
 
 var defaultLogFormatter = &logrus.JSONFormatter{
-	CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
-		return frame.Function, path.Base(frame.File)
-	},
+	// CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
+	// 	return frame.Function, path.Base(frame.File)
+	// },
 }
 
 func init() {
