@@ -1,0 +1,24 @@
+{
+    "project":"nomainc",
+    "level":"INFO",
+    "metric":true,
+    "mysql":[
+        {
+            "default":true,
+            "database":"user",
+            "user":"user",
+            "password":"pwd",
+            "host":"127.0.0.1:3306"
+        }
+    ],
+    "redis":[
+        {
+            "host":"127.0.0.1:3306",
+            "name":"common",
+            "default":true,
+            "auth":"xxx"
+        }
+
+
+    ]
+}
