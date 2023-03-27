@@ -1,7 +1,7 @@
 {
     "project":"nomainc",
     "level":"info",
-    "enable_metrics":true,
+    "enable_metric":true,
     "env":"dev",
     "http_server":{
         "enable":true,
@@ -22,6 +22,7 @@
             {
                 "name":"xxx",
                 "default":true,
+                "enable":true,
                 "host":"127.0.0.1:3306",
                 "database":"user",
                 "user":"user",
@@ -35,6 +36,7 @@
             {
                 "name":"common",
                 "default":true,
+                "enable":true,
                 "host":"127.0.0.1:3306",
                 "password":"xxx",
                 "db":0

@@ -4,13 +4,12 @@ import (
 	"io/ioutil"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"github.com/sirupsen/logrus"
 )
 
 // TODO LIST:
-// 1. gin.Context -> frame.Context 完成1
+// 1. gin.Context -> frame.Context 完成
 // 4. 跑通demo  完成
 // 2. 集成 Config
 // 3. 优化 Redis,Mysql 连接,日志打印
@@ -20,8 +19,10 @@ import (
 // Engine frame engine
 type Engine struct {
 	*gin.Engine
-	DB  *gorm.DB
-	Log *logrus.Entry
+	config       Config
+	dbClients    *DBMultiClient
+	redisClients *RedisMultiClient
+	Log          *logrus.Entry
 }
 
 // Run engin run
@@ -39,7 +40,6 @@ func Default() *Engine {
 		// DB:     newGrom("TODO"),
 	}
 	return e
-
 }
 
 func NewEngine() *Engine {
@@ -55,6 +55,7 @@ func NewEngine() *Engine {
 
 	return &Engine{
 		Engine: defaultEngine(),
+		config: GetConfig(),
 		// DB:     db,
 		Log: logger.WithField("component", "MyEngine"),
 	}
@@ -69,10 +70,10 @@ func defaultEngine() *gin.Engine {
 
 func (e *Engine) createContext(c *gin.Context) *Context {
 	return &Context{
-		// TODO: config, log, mysql, redis
-		Context: c,
-		// DB:      e.DB,
-		// Log: e.Log.WithField("request_id", c.GetString("request_id")),
+		Context:      c,
+		config:       &e.config,
+		redisClients: e.redisClients,
+		dbClients:    e.dbClients,
 	}
 }
 

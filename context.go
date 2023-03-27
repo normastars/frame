@@ -2,15 +2,46 @@ package frame
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 // Context 获取 frame 上下文
 type Context struct {
 	*gin.Context
-	db     *gin.Context
-	log    *logrus.Entry
-	config *Config
+	config       *Config
+	dbClients    *DBMultiClient
+	redisClients *RedisMultiClient
+	log          *logrus.Entry
+}
+
+// GetDB get db client
+func (ctx *Context) GetDB(name ...string) *gorm.DB {
+	// default mysql client
+	if len(ctx.dbClients.clients) == 1 && len(name) == 0 {
+		for _, v := range ctx.dbClients.clients {
+			return v
+		}
+	}
+	if len(name) == 0 {
+		panic("db client can't find, db name is empty")
+	}
+	return ctx.dbClients.clients[name[0]]
+}
+
+// GetRedis get redis client
+func (ctx *Context) GetRedis(name ...string) *redis.Client {
+	// default redis client
+	if len(ctx.redisClients.clients) == 1 && len(name) == 0 {
+		for _, v := range ctx.redisClients.clients {
+			return v
+		}
+	}
+	if len(name) == 0 {
+		panic("redis client can't find, redis name is empty")
+	}
+	return ctx.redisClients.clients[name[0]]
 }
 
 // // DB 获取GORM数据库连接

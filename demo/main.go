@@ -20,7 +20,7 @@ func main() {
 	// })
 
 	// router.Run(":8080")
-	config := frame.ReadConfig()
+	config := frame.GetConfig()
 	b, _ := yaml.Marshal(config)
 	fmt.Println(string(b))
 }
