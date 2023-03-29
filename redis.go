@@ -17,11 +17,16 @@ var redisMultiConn = &RedisMultiClient{
 	clients: map[string]*redis.Client{},
 }
 
-func openRedisServers(config RedisConfig) {
+// GetRedisConn 获取 redis 链接
+func GetRedisConn() *RedisMultiClient {
+	return redisMultiConn
+}
+
+func newRedisServers(conf *Config) {
 	// 只会初始化一次
 	redisOnce.Do(func() {
-		if len(config.Configs) > 0 && config.Enable {
-			for _, v := range config.Configs {
+		if len(conf.Redis.Configs) > 0 && conf.Redis.Enable {
+			for _, v := range conf.Redis.Configs {
 				openRedis(v)
 			}
 		}
@@ -30,6 +35,9 @@ func openRedisServers(config RedisConfig) {
 }
 
 func openRedis(item RedisConfigItem) {
+	if !item.Enable {
+		return
+	}
 	client := redis.NewClient(&redis.Options{
 		Addr:     item.Host,
 		Password: item.Password,

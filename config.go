@@ -40,11 +40,12 @@ type MySQLConfigItem struct {
 	Name              string `json:"name"`
 	Default           bool   `json:"default"`
 	Enable            bool   `json:"enable"`
-	EnableAutoMigrate bool   `json:"enable_auto_migrate"  mapstructure:"enable_auto_migrate"`
+	EnableAutoMigrate bool   `json:"enable_auto_migrate" mapstructure:"enable_auto_migrate"`
 	Host              string `json:"host"`
 	Database          string `json:"database"`
 	User              string `json:"user"`
 	Password          string `json:"password"`
+	SlowThresholdSec  int    `json:"slow_threshold_sec" mapstructure:"slow_threshold_sec"`
 }
 
 // RedisConfig redis config
@@ -65,7 +66,7 @@ type RedisConfigItem struct {
 }
 
 // GetConfig read config
-func GetConfig() Config {
+func NewConfig() *Config {
 	path := "../conf/default.json"
 	viper.SetConfigFile(path)
 	// 读取配置文件并检查错误
@@ -77,5 +78,5 @@ func GetConfig() Config {
 	if err := viper.Unmarshal(c); err != nil {
 		panic(err)
 	}
-	return *c
+	return c
 }

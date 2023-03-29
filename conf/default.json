@@ -20,18 +20,20 @@
         "enable":true,
         "configs":[
             {
-                "name":"xxx",
+                "name":"user",
                 "default":true,
                 "enable":true,
-                "host":"127.0.0.1:3306",
+                "host":"127.0.0.1:3309",
                 "database":"user",
-                "user":"user",
-                "password":"pwd"
+                "user":"root",
+                "password":"root",
+                "slow_threshold_sec": 3,
+                "enable_auto_migrate":true
             }
         ]
     },
     "redis":{
-        "enable": true,
+        "enable": false,
         "configs":[
             {
                 "name":"common",

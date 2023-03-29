@@ -10,6 +10,7 @@ var defaultLogFormatter = &logrus.JSONFormatter{
 	// },
 }
 
+// init config project logrus log
 func init() {
 	// default log config
 	logrus.SetReportCaller(true)

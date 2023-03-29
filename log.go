@@ -10,23 +10,65 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
+	"gorm.io/gorm/logger"
 )
 
-type Hook struct {
-	TraceID string
+// NewLogger new logger
+func NewLogger(conf ...*Config) *logrus.Logger {
+	var l string
+	if len(conf) > 0 {
+		l = conf[0].Level
+	}
+	return newLoggerLevel(l)
 }
 
-func NewHook(trace_id string) *Hook {
-	return &Hook{TraceID: trace_id}
+func newLoggerLevel(level string) *logrus.Logger {
+	logger := logrus.New()
+	logger.SetReportCaller(true)
+	logger.SetFormatter(defaultLogFormatter)
+	if len(level) <= 0 {
+		logger.SetLevel(logrus.DebugLevel)
+		return logger
+	}
+	// set log level, default info level
+	logger.SetLevel(log2Level(level))
+	return logger
 }
 
-func (h *Hook) Levels() []logrus.Level {
-	return logrus.AllLevels
+var logm = map[string]logrus.Level{
+	"panic": logrus.PanicLevel,
+	"fatal": logrus.FatalLevel,
+	"error": logrus.ErrorLevel,
+	"warn":  logrus.WarnLevel,
+	"info":  logrus.InfoLevel,
+	"debug": logrus.DebugLevel,
+	"trace": logrus.TraceLevel,
 }
 
-func (h *Hook) Fire(entry *logrus.Entry) error {
-	entry.Data[TraceID] = h.TraceID
-	return nil
+var gormLogm = map[string]logger.LogLevel{
+	"error": logger.Error,
+	"warn":  logger.Warn,
+	"info":  logger.Info,
+}
+
+func log2gormLevel(l string) logger.LogLevel {
+	l = strings.ToLower(l)
+	le, ok := gormLogm[l]
+	if ok {
+		return le
+	}
+	// default silent level
+	return logger.Silent
+}
+
+func log2Level(l string) logrus.Level {
+	l = strings.ToLower(l)
+	le, ok := logm[l]
+	if ok {
+		return le
+	}
+	// default info level
+	return logrus.InfoLevel
 }
 
 // LoggerFunc log func
