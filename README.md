@@ -1,7 +1,7 @@
 
 <p align="center">
   <img alt="GoReleaser Logo" src="https://avatars2.githubusercontent.com/u/24697112?v=3&s=200" height="140" />
-  <h3 align="center">Template-go</h3>
+  <h3 align="center">Frame</h3>
   <p align="center">
     <a href="https://github.com/nomainc/frame/releases/latest"><img alt="Codecov" src="https://img.shields.io/github/v/release/imyuliz/template-go.svg?logo=github&style=flat-square"></a>
     <a href="https://codecov.io/gh/imyuliz/template-go"><img alt="Codecov" src="https://img.shields.io/codecov/c/github/imyuliz/template-go?logo=codecov&style=flat-square"></a>
@@ -14,8 +14,54 @@
 
 ---
 
-template for Go project.
+noma frame.
 ---
+### 基于此框架项目启动说明
+1. 配置路径: 可以通过环境变量**CONFPATH** 指定, 如未指定默认:**/conf/default.json**, 配置内容可以在**./docs/config.md** 复制
+2. 基本框架支持 mysql 连接, redis 连接, log 格式化, prometheus 指标采集, 基本的链路追踪, 根据需要配置
+3. 在 handler 如果要获取 mysql 连接, 可使用 **ctx.GetDB()**  或 **ctx.Redis()**
+
+### 启动示例
+```
+import (
+	"fmt"
+	"net/http"
+
+	"github.com/nomainc/frame"
+	"github.com/nomainc/frame/version"
+)
+
+type User struct {
+	ID   int    `json:"id,omitempty"`
+	Name string `json:"name,omitempty"`
+}
+
+func main() {
+	fmt.Printf("commit: %20s\n", version.GitCommit)
+	fmt.Printf("built on %20s\n", version.BuildGoVersion)
+	fmt.Printf("built on %20s\n", version.BuildSystem)
+	app := frame.New()
+	app.GET("/hello", HelloWorld)
+
+	app.Run()
+
+}
+
+// HelloWorld hell world handler
+func HelloWorld(c *frame.Context) {
+	db := c.GetDB("user")
+	// create user
+	user := User{Name: "test_user"}
+	result := db.Create(&user)
+	if result.Error != nil {
+		c.Fatalf("failed to create user: %v", result.Error)
+	}
+	c.Infof("created user: %v\n", user)
+	c.HTTPError2(http.StatusOK, "X0111", "normal error", fmt.Errorf("system panic"))
+}
+
+```
+
 
 ### 特性
 
@@ -56,7 +102,7 @@ template for Go project.
 
 ### 常见命令
 
-1. 手动测试镜像构建 `docker build -t template-go -f build/docker/Dockerfile .`
+1. 手动测试镜像构建 `docker build -t imagename:v0.0.1 -f build/docker/Dockerfile .`
 2. 发布新版本 `git tag v1.0.0 && git push --tags`
 ### Git 提交规范
 
