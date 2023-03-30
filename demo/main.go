@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"net/http"
+
 	"github.com/nomainc/frame"
 	"github.com/nomainc/frame/version"
 	"github.com/sirupsen/logrus"
@@ -53,7 +56,7 @@ func main() {
 			ctx.Fatalf("failed to delete user: %v", result.Error)
 		}
 		ctx.Infoln("哈哈哈")
-		ctx.Success(nil)
+		ctx.HTTPError2(http.StatusOK, "X0111", fmt.Errorf("普通错误"), fmt.Errorf("系统致命错误"))
 	})
 
 	router.Run(":8080")
