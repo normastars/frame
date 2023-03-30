@@ -12,7 +12,7 @@ import (
 
 // Context frame context
 type Context struct {
-	*gin.Context
+	Gtx          *gin.Context
 	config       *Config
 	dbClients    *DBMultiClient
 	redisClients *RedisMultiClient
@@ -21,7 +21,7 @@ type Context struct {
 
 // GetTraceID return trace id from context
 func (c *Context) GetTraceID() string {
-	return c.Context.GetHeader(TraceIDKey)
+	return c.Gtx.GetHeader(TraceIDKey)
 }
 
 func (c *Context) getGormLogger() logger.Interface {
@@ -30,7 +30,7 @@ func (c *Context) getGormLogger() logger.Interface {
 
 // WithTraceContext return context
 func (c *Context) WithTraceContext() context.Context {
-	id := c.GetHeader(TraceIDKey)
+	id := c.Gtx.GetHeader(TraceIDKey)
 	pc := context.Background()
 	return context.WithValue(pc, TraceIDKey, id)
 }
@@ -78,12 +78,12 @@ func (c *Context) GetRedis(name ...string) *redis.Client {
 
 // GetSetTraceHeader get trace_id from header, will set trace_id in header when header trace_id is empty
 func (c *Context) GetSetTraceHeader() string {
-	traceID := c.GetHeader(TraceIDKey)
+	traceID := c.Gtx.GetHeader(TraceIDKey)
 	if len(traceID) > 0 {
 		return traceID
 	}
 	traceID = generalTraceID(c.config.Project)
-	c.Context.Header(TraceIDKey, traceID)
+	c.Gtx.Header(TraceIDKey, traceID)
 	return traceID
 }
 

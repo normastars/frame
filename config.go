@@ -23,6 +23,7 @@ type Config struct {
 // HTTPServer http config
 type HTTPServer struct {
 	Enable        bool               `json:"enable"`
+	EnableCors    bool               `json:"enable_cors" yaml:"enable_cors" mapstructure:"enable_cors"`
 	DisableReqLog bool               `json:"disable_req_log" yaml:"disable_req_log" mapstructure:"disable_req_log"` // default enable
 	Configs       []HTTPServerConfig `json:"configs"`
 }
@@ -91,6 +92,8 @@ func LoadConfig() *Config {
 // Validate validate config
 func (c *Config) Validate() error {
 	// TODO: check config
+	// b, _ := json.Marshal(c)
+	// fmt.Println(string(b))
 	return nil
 }
 

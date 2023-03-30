@@ -126,6 +126,9 @@ func newApp() *App {
 	}
 	// common trace id
 	e.NewLogEntry()
+	if e.config.HTTPServer.EnableCors {
+		e.Use(CORSFunc())
+	}
 	e.Use(TraceFunc())
 	e.Use(LoggerFunc())
 	return e
@@ -140,7 +143,7 @@ func (e *App) createContext(c *gin.Context) *Context {
 	traceID := c.GetHeader(TraceIDKey)
 	l := e.log.WithField(TraceIDKey, traceID)
 	return &Context{
-		Context:      c,
+		Gtx:          c,
 		config:       e.config,
 		redisClients: e.redisClients,
 		dbClients:    e.dbClients,

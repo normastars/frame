@@ -2,10 +2,11 @@
     "project":"nomainc",
     "log_level":"info",
     "log_mode":"text",
-    "enable_metric":true,
+    "enable_metric":false,
     "env":"dev",
     "http_server":{
         "enable":true,
+        "enable_cors":false,
         "disable_req_log":false,
         "configs":[
             {

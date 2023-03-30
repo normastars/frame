@@ -10,13 +10,13 @@ import (
 // TraceFunc trace id func
 func TraceFunc() HandlerFunc {
 	return func(c *Context) {
-		traceID := c.Request.Header.Get(TraceIDKey)
+		traceID := c.Gtx.Request.Header.Get(TraceIDKey)
 		if traceID == "" {
 			traceID = generalTraceID(c.config.Project)
-			c.Request.Header.Set(TraceIDKey, traceID)
+			c.Gtx.Request.Header.Set(TraceIDKey, traceID)
 		}
-		c.Context.Writer.Header().Set(TraceIDKey, traceID)
-		c.Next()
+		c.Gtx.Writer.Header().Set(TraceIDKey, traceID)
+		c.Gtx.Next()
 	}
 }
 

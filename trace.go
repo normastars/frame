@@ -86,8 +86,8 @@ func LoggerFunc() HandlerFunc {
 
 		//  request body
 		var requestBody string
-		if c.Request.Body != nil {
-			bodyBytes, err := ioutil.ReadAll(c.Request.Body)
+		if c.Gtx.Request.Body != nil {
+			bodyBytes, err := ioutil.ReadAll(c.Gtx.Request.Body)
 			if err != nil {
 				log.WithError(err).Error("Failed to read request body")
 			} else {
@@ -95,21 +95,21 @@ func LoggerFunc() HandlerFunc {
 			}
 
 			// reset body
-			c.Request.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+			c.Gtx.Request.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 		}
 
 		// request header
 		requestHeader := make(map[string]string)
-		for k, v := range c.Request.Header {
+		for k, v := range c.Gtx.Request.Header {
 			requestHeader[k] = strings.Join(v, ",")
 		}
 
 		// response body
-		w := &responseWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Context.Writer}
-		c.Context.Writer = w
+		w := &responseWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Gtx.Writer}
+		c.Gtx.Writer = w
 
 		// detail request
-		c.Next()
+		c.Gtx.Next()
 
 		// request end
 		endTime := time.Now()
@@ -120,11 +120,11 @@ func LoggerFunc() HandlerFunc {
 			return
 		}
 		go func() {
-			httpCode := c.Context.Writer.Status()
+			httpCode := c.Gtx.Writer.Status()
 			hcr := fmt.Sprintf("%d", httpCode)
 			busCode := jsonGet(rb, codeKey)
-			method := c.Context.Request.Method
-			url := c.Request.URL.Path
+			method := c.Gtx.Request.Method
+			url := c.Gtx.Request.URL.Path
 
 			if c.config.EnableMetric {
 				// metrics
@@ -135,12 +135,12 @@ func LoggerFunc() HandlerFunc {
 				return
 			}
 			reqLog := logBody{
-				RequestID:  c.Request.Header.Get(TraceIDKey),
+				RequestID:  c.Gtx.Request.Header.Get(TraceIDKey),
 				Code:       busCode,
-				StatusCode: c.Context.Writer.Status(),
+				StatusCode: c.Gtx.Writer.Status(),
 				Duration:   duration,
 				Msg:        jsonGet(rb, msgKey),
-				Path:       c.Request.URL.Path,
+				Path:       c.Gtx.Request.URL.Path,
 				Extra: reqLogExtra{
 					Req: reqLogBody{
 						// Header: requestHeader,

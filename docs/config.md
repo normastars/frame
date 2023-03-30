@@ -6,10 +6,11 @@
     "project":"nomainc",
     "log_level":"info",
     "log_mode":"text",
-    "enable_metric":true,
+    "enable_metric":false,
     "env":"dev",
     "http_server":{
         "enable":true,
+        "enable_cors":false,
         "disable_req_log":false,
         "configs":[
             {
@@ -65,6 +66,7 @@
 | enable_metric | bool | false | 是否启用指标采集,默认:不采集 |
 | env | string | dev | 环境名称,必填项 |
 | http_server.enable | bool | false | 是否启动HTTP服务,默认不启动 |
+| http_server.enable_cors | bool | false | 是否运行cors跨域, 默认不允许 |
 | http_server.disable_req_log | bool | false | 是否禁用HTTP请求日志,默认启用 |
 | http_server.configs | array | nil | HTTP服务配置项列表, 如果 http_server.enable 为true,此处不能为空 |
 | mysql.enable | bool | false | 是否启用MySQL数据库,默认不启用 |

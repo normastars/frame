@@ -19,7 +19,7 @@ func (e *App) convert2FrameContext(c *gin.Context) *Context {
 	traceID := c.GetHeader(TraceIDKey)
 	l := e.log.WithField(TraceIDKey, traceID)
 	return &Context{
-		Context:      c,
+		Gtx:          c,
 		config:       e.config,
 		dbClients:    e.dbClients,
 		redisClients: e.redisClients,

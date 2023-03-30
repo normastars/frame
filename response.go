@@ -32,7 +32,7 @@ func (ctx *Context) Success(data interface{}) {
 		Data:    data,
 		Time:    time.Now(),
 	}
-	ctx.JSON(200, resp)
+	ctx.Gtx.JSON(200, resp)
 }
 
 // ErrorMsg frame err msg
@@ -55,7 +55,7 @@ func (ctx *Context) Error(errMsg ErrorMsg) {
 		Time:    time.Now(),
 	}
 	ctx.printRealMsgLog(errMsg.GetReal())
-	ctx.JSON(http.StatusOK, resp)
+	ctx.Gtx.JSON(http.StatusOK, resp)
 }
 
 // HTTPError http response error msg and setting http code
@@ -69,7 +69,7 @@ func (ctx *Context) HTTPError(httpCode int, errMsg ErrorMsg) {
 		Time:      time.Now(),
 	}
 	ctx.printRealMsgLog(errMsg.GetReal())
-	ctx.JSON(httpCode, resp)
+	ctx.Gtx.JSON(httpCode, resp)
 }
 
 // HTTPError2 http error response
@@ -82,7 +82,7 @@ func (ctx *Context) HTTPError2(httpCode int, bussCode, userReply string, realMsg
 		Time:      time.Now(),
 	}
 	ctx.printRealMsgLog(realMsg.Error())
-	ctx.JSON(httpCode, resp)
+	ctx.Gtx.JSON(httpCode, resp)
 }
 
 func (ctx *Context) printRealMsgLog(realMsg string) {
@@ -104,7 +104,7 @@ func (ctx *Context) HTTPListSuccess(pageData *PageResults) {
 		Data:      pageData,
 		Time:      time.Now(),
 	}
-	ctx.JSON(http.StatusOK, resp)
+	ctx.Gtx.JSON(http.StatusOK, resp)
 }
 
 // HTTPListError if pageData nil or pageData.Results id empty,auto set []
@@ -118,7 +118,7 @@ func (ctx *Context) HTTPListError(errMsg ErrorMsg) {
 		Time:    time.Now(),
 	}
 	ctx.printRealMsgLog(errMsg.GetReal())
-	ctx.JSON(http.StatusOK, resp)
+	ctx.Gtx.JSON(http.StatusOK, resp)
 }
 
 func realMsgs(msg string) *realMsg {
@@ -153,7 +153,7 @@ func (ctx *Context) HTTPListError2(httpCode int, errMsg ErrorMsg) {
 		Time:      time.Now(),
 	}
 	ctx.printRealMsgLog(errMsg.GetReal())
-	ctx.JSON(httpCode, resp)
+	ctx.Gtx.JSON(httpCode, resp)
 }
 
 func emptyPage(pageData *PageResults) {
