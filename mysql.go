@@ -1,12 +1,14 @@
 package frame
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -103,6 +105,51 @@ func createDatabase(user, password, host, database string) error {
 // createDatabaseSQL 创建数据库
 func createDatabaseSQL(database string) string {
 	return fmt.Sprintf("CREATE DATABASE %s CHARACTER SET utf8 COLLATE utf8_general_ci", database)
+}
+
+type gormLogger struct {
+	Log *logrus.Logger
+}
+
+func newGormLogger(config *Config) logger.Interface {
+	return &gormLogger{Log: NewLogger(config)}
+}
+
+func (l *gormLogger) LogMode(level logger.LogLevel) logger.Interface {
+	return l
+}
+
+func (l *gormLogger) Info(ctx context.Context, msg string, data ...interface{}) {
+	l.Log.WithFields(logrus.Fields{
+		TraceID: getTraceIDFromContext(ctx),
+	}).Infof(msg, data...)
+}
+
+func (l *gormLogger) Warn(ctx context.Context, msg string, data ...interface{}) {
+	l.Log.WithFields(logrus.Fields{
+		TraceID: getTraceIDFromContext(ctx),
+	}).Warnf(msg, data...)
+}
+
+func (l *gormLogger) Error(ctx context.Context, msg string, data ...interface{}) {
+	l.Log.WithFields(logrus.Fields{
+		TraceID: getTraceIDFromContext(ctx),
+	}).Errorf(msg, data...)
+}
+
+func (l *gormLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+	if err != nil {
+		l.Log.WithFields(logrus.Fields{
+			TraceID:    getTraceIDFromContext(ctx),
+			"duration": time.Since(begin).Milliseconds(),
+			"error":    err.Error(),
+		}).Error(fc())
+	} else {
+		l.Log.WithFields(logrus.Fields{
+			TraceID:    getTraceIDFromContext(ctx),
+			"duration": time.Since(begin).Milliseconds(), //
+		}).Infoln(fc())
+	}
 }
 
 // func open(dialects, host, database, user, password string) *gorm.DB {

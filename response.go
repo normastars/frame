@@ -1,16 +1,18 @@
 package frame
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 )
 
 // Response http response data
 type Response struct {
-	Code    string      `json:"code,omitempty"`
-	Data    interface{} `json:"data,omitempty"`
-	Message string      `json:"message,omitempty"`
-	Time    time.Time   `json:"time,omitempty"`
+	Code      string      `json:"code,omitempty"`
+	RequestID string      `json:"request_id,omitempty"`
+	Data      interface{} `json:"data,omitempty"`
+	Message   string      `json:"message,omitempty"`
+	Time      time.Time   `json:"time,omitempty"`
 }
 
 // PageResults http response list data
@@ -60,7 +62,7 @@ func (ctx *Context) Error(errMsg ErrorMsg) {
 		Data:    nil,
 		Time:    time.Now(),
 	}
-	// TODO: 打印真正的错误原因
+	ctx.printRealMsgLog(errMsg.GetReal())
 	ctx.JSON(http.StatusOK, resp)
 }
 
@@ -68,54 +70,97 @@ func (ctx *Context) Error(errMsg ErrorMsg) {
 // default json
 func (ctx *Context) HTTPError(httpCode int, errMsg ErrorMsg) {
 	resp := &Response{
-		Code:    errMsg.GetCode(),
-		Message: errMsg.GetReply(),
-		Data:    nil,
-		Time:    time.Now(),
+		RequestID: ctx.GetTraceID(),
+		Code:      errMsg.GetCode(),
+		Message:   errMsg.GetReply(),
+		Data:      nil,
+		Time:      time.Now(),
 	}
-	// TODO: 打印真正的错误原因
+	ctx.printRealMsgLog(errMsg.GetReal())
 	ctx.JSON(httpCode, resp)
 }
 
-// ListSuccess 如果 pageData 是nil 或者 pageData.Results 是空,自动设置为空数组[]
-// http response 结果集是数组或切片时使用
-// default json
-func (ctx *Context) ListSuccess(pageData *PageResults) {
-	emptyPage(pageData)
+// HTTPError2 http error response
+func (ctx *Context) HTTPError2(httpCode int, bussCode, userReply string, realMsg error) {
 	resp := &Response{
-		Code:    successCode,
-		Message: successMsg,
-		Data:    pageData,
-		Time:    time.Now(),
+		RequestID: ctx.GetTraceID(),
+		Code:      bussCode,
+		Message:   userReply,
+		Data:      nil,
+		Time:      time.Now(),
 	}
-	ctx.JSON(http.StatusOK, resp)
+	ctx.printRealMsgLog(realMsg.Error())
+	ctx.JSON(httpCode, resp)
 }
 
-// ListError 自动将结果集设置为空数组
+func (ctx *Context) printRealMsgLog(realMsg string) {
+	msg := realMsgs(realMsg).String()
+	if len(msg) > 0 {
+		ctx.Errorln(msg)
+	}
+}
+
+// HTTPListSuccess 如果 pageData 是nil 或者 pageData.Results 是空,自动设置为空数组[]
 // http response 结果集是数组或切片时使用
 // default json
-func (ctx *Context) ListError(errMsg ErrorMsg) {
+func (ctx *Context) HTTPListSuccess(pageData *PageResults) {
+	emptyPage(pageData)
 	resp := &Response{
-		Code:    errMsg.GetCode(),
-		Message: errMsg.GetReply(),
-		Data:    defaultEmptyPage,
-		Time:    time.Now(),
+		RequestID: ctx.GetTraceID(),
+		Code:      successCode,
+		Message:   successMsg,
+		Data:      pageData,
+		Time:      time.Now(),
 	}
-	// TODO: 打印真实的错误信息
 	ctx.JSON(http.StatusOK, resp)
 }
 
 // HTTPListError 自动将结果集设置为空数组
 // http response 结果集是数组或切片时使用
 // default json
-func (ctx *Context) HTTPListError(httpCode int, errMsg ErrorMsg) {
+func (ctx *Context) HTTPListError(errMsg ErrorMsg) {
 	resp := &Response{
 		Code:    errMsg.GetCode(),
 		Message: errMsg.GetReply(),
 		Data:    defaultEmptyPage,
 		Time:    time.Now(),
 	}
-	// TODO: 打印真实的错误信息
+	ctx.printRealMsgLog(errMsg.GetReal())
+	ctx.JSON(http.StatusOK, resp)
+}
+
+func realMsgs(msg string) *realMsg {
+	return &realMsg{
+		Mode: "real_reason",
+		Msg:  msg,
+	}
+}
+
+type realMsg struct {
+	Mode string `json:"mode,omitempty"`
+	Msg  string `json:"msg,omitempty"`
+}
+
+func (m *realMsg) String() string {
+	b, err := json.Marshal(m)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+// HTTPListError2 自动将结果集设置为空数组
+// http response 结果集是数组或切片时使用
+// default json
+func (ctx *Context) HTTPListError2(httpCode int, errMsg ErrorMsg) {
+	resp := &Response{
+		RequestID: ctx.GetTraceID(),
+		Code:      errMsg.GetCode(),
+		Message:   errMsg.GetReply(),
+		Data:      defaultEmptyPage,
+		Time:      time.Now(),
+	}
+	ctx.printRealMsgLog(errMsg.GetReal())
 	ctx.JSON(httpCode, resp)
 }
 

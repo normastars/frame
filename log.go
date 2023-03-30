@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
+	"path"
+	"runtime"
 	"strings"
 	"time"
 
@@ -12,6 +14,20 @@ import (
 	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm/logger"
 )
+
+var defaultJSONLogFormatter = &logrus.JSONFormatter{
+	CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
+		return frame.Function, path.Base(frame.File)
+	},
+}
+
+// init config project logrus log
+func init() {
+	// default log config
+	logrus.SetReportCaller(true)
+	// set file name
+	logrus.SetFormatter(defaultJSONLogFormatter)
+}
 
 // NewLogger new logger
 func NewLogger(conf ...*Config) *logrus.Logger {

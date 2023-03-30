@@ -1,6 +1,7 @@
 package frame
 
 import (
+	"context"
 	"io/ioutil"
 
 	"github.com/gin-gonic/gin"
@@ -55,8 +56,6 @@ func NewEngine() *Engine {
 	newRedisServers(conf)
 	redisConns := GetRedisConn()
 
-	// 初始化 logrus 日志包
-
 	e := &Engine{
 		Engine:       defaultEngine(),
 		log:          logger,
@@ -71,13 +70,10 @@ func NewEngine() *Engine {
 
 func defaultEngine() *gin.Engine {
 	r := gin.Default()
-	// r.Use(TraceFunc())
-	// r.Use(LoggerFunc())
 	return r
 }
 
 func (e *Engine) createContext(c *gin.Context) *Context {
-	// set log trace_id
 	traceID := c.GetHeader(TraceID)
 	l := e.log.WithField(TraceID, traceID)
 	return &Context{
@@ -88,11 +84,6 @@ func (e *Engine) createContext(c *gin.Context) *Context {
 		Entry:        l,
 	}
 }
-
-// Use middleware
-// func (e *Engine) Use(middleware ...gin.HandlerFunc) {
-// 	e.Engine.Use(middleware...)
-// }
 
 // GET get method
 func (e *Engine) GET(relativePath string, handler func(c *Context)) {
@@ -140,4 +131,9 @@ func (e *Engine) HEAD(relativePath string, handler func(c *Context)) {
 		ctx := e.createContext(c)
 		handler(ctx)
 	})
+}
+
+func getTraceIDFromContext(ctx context.Context) string {
+	traceID := ctx.Value(TraceID)
+	return traceID.(string)
 }

@@ -1,7 +1,7 @@
 {
     "project":"nomainc",
     "log_level":"info",
-    "log_mode": "json",
+    "log_mode": "text",
     "enable_metric":true,
     "env":"dev",
     "http_server":{
@@ -34,14 +34,14 @@
         ]
     },
     "redis":{
-        "enable": false,
+        "enable": true,
         "configs":[
             {
-                "name":"common",
+                "name":"user",
                 "default":true,
                 "enable":true,
-                "host":"127.0.0.1:3306",
-                "password":"xxx",
+                "host":"127.0.0.1:6380",
+                "password":"",
                 "db":0
             }
         ]

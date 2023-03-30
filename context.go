@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis"
+	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -19,13 +19,16 @@ type Context struct {
 	*logrus.Entry
 }
 
-func (c *Context) getGormLogger() logger.Interface {
-	traceID := c.GetHeader(TraceID)
-	return newGormLogger(traceID, c.config).LogMode(log2gormLevel(c.config.LogLevel))
+func (c *Context) GetTraceID() string {
+	return c.Context.GetHeader(TraceID)
 }
 
-// WithContext return context
-func (c *Context) WithContext() context.Context {
+func (c *Context) getGormLogger() logger.Interface {
+	return newGormLogger(c.config).LogMode(log2gormLevel(c.config.LogLevel))
+}
+
+// WithTraceContext return context
+func (c *Context) WithTraceContext() context.Context {
 	return context.WithValue(context.Background(), TraceID, c.GetHeader(TraceID))
 }
 
@@ -34,7 +37,7 @@ func (ctx *Context) GetDB(name ...string) *gorm.DB {
 	// default mysql client
 	if len(ctx.dbClients.clients) == 1 && len(name) == 0 {
 		for _, v := range ctx.dbClients.clients {
-			v = v.WithContext(ctx.WithContext())
+			v = v.WithContext(ctx.WithTraceContext())
 			v.Logger = ctx.getGormLogger()
 			return v
 		}
@@ -44,7 +47,7 @@ func (ctx *Context) GetDB(name ...string) *gorm.DB {
 	}
 	db := ctx.dbClients.clients[name[0]]
 	if db != nil {
-		db = db.WithContext(ctx.WithContext())
+		db = db.WithContext(ctx.WithTraceContext())
 		db.Logger = ctx.getGormLogger()
 	}
 	return db
@@ -55,13 +58,18 @@ func (ctx *Context) GetRedis(name ...string) *redis.Client {
 	// default redis client
 	if len(ctx.redisClients.clients) == 1 && len(name) == 0 {
 		for _, v := range ctx.redisClients.clients {
+			v = v.WithContext(ctx.WithTraceContext())
+			v.AddHook(newRedisLogHook(ctx.config))
 			return v
 		}
 	}
 	if len(name) == 0 {
 		panic("redis client can't find, redis name is empty")
 	}
-	return ctx.redisClients.clients[name[0]]
+	r := ctx.redisClients.clients[name[0]]
+	r = r.WithContext(ctx.WithTraceContext())
+	r.AddHook(newRedisLogHook(ctx.config))
+	return r
 }
 
 func (ctx *Context) GetLogger() *logrus.Entry {

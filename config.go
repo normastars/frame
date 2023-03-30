@@ -68,7 +68,7 @@ type RedisConfigItem struct {
 
 // GetConfig read config
 func NewConfig() *Config {
-	path := "../conf/default.json"
+	path := "./conf/default.json"
 	viper.SetConfigFile(path)
 	// 读取配置文件并检查错误
 	err := viper.ReadInConfig()

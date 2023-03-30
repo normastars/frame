@@ -1,4 +1,4 @@
-PROJECT_NAME := "github.com/nomainc/frame"
+PROJECT_NAME := "github.com/nomainc/frame/example"
 PKG := "$(PROJECT_NAME)"
 PKG_LIST := $(shell go list ${PKG}/... | grep -v /vendor/)
 LDFLAGS := "-s -w -X '$(PROJECT_NAME)/version.GitCommit=`git log | grep commit | head -1 | cut -d" " -f2 | cut -c1-8`' -X '$(PROJECT_NAME)/version.BuildGoVersion=`go version | cut -d" " -f3`' -X '$(PROJECT_NAME)/version.BuildSystem=`go version | cut -d" " -f4`'"
@@ -10,7 +10,11 @@ build: ## Build the binary file
 	go build -ldflags=${LDFLAGS} -o bin/server
 build-min-docker:
 	# go build -ldflags=${LDFLAGS} -o bin/server && upx --best bin/server -o _upx_server && mv -f _upx_server bin/server
-	go build -ldflags=${LDFLAGS} -o bin/server 
+	# go build -ldflags=${LDFLAGS} -o bin/server
+	make clean
+	make linux
+	# TODO: need fix <registername> and <imagename>
+	docker build -t registername/imagename:v1 -f ./build/docker/Dockerfile .
 clean: ## Remove previous build
 	rm -rf bin
 	rm -rf manifest.txt

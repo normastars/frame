@@ -2,8 +2,10 @@ package frame
 
 import "github.com/gin-gonic/gin"
 
+// HandlerFunc freme middleware
 type HandlerFunc func(*Context)
 
+// Use use middleware
 func (e *Engine) Use(middleware ...HandlerFunc) {
 	if len(middleware) > 0 {
 		for i := range middleware {
@@ -22,7 +24,6 @@ func (e *Engine) convert2FrameContext(c *gin.Context) *Context {
 		dbClients:    e.dbClients,
 		redisClients: e.redisClients,
 		Entry:        l,
-		// 将其他必要的字段从Gin的Context复制到Frame的Context中
 	}
 }
 
