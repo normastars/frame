@@ -2,9 +2,13 @@ package frame
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
+	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
 
@@ -17,33 +21,70 @@ import (
 // 6. 优化 Log 包
 
 // Engine frame engine
-type Engine struct {
+type App struct {
 	*gin.Engine
 	config       *Config
 	dbClients    *DBMultiClient
 	redisClients *RedisMultiClient
 	log          *logrus.Logger
+	*logrus.Entry
 }
 
 // Run engin run
 // ":8080"
-func (e *Engine) Run(addr string) error {
+func (e *App) Run(addr string) error {
+	go e.metricRun()
 	return e.Engine.Run(addr)
 }
 
-// Default engin
-func Default() *Engine {
-	// 关闭Gin的日志输出
+func (e *App) metricRun() {
+	if e.config.EnableMetric {
+		// metrics
+		port := e.getMetricPort()
+		http.Handle("/metrics", promhttp.Handler())
+		e.Infof("metric server listen %s", port)
+		http.ListenAndServe(port, nil)
+	}
+}
+
+// NewLogEntry new log entry
+func (e *App) NewLogEntry() {
+	e.Entry = e.log.WithField(TraceIDKey, generalTraceID(e.config.Project))
+}
+
+func (e *App) getMetricPort() string {
+	port := ""
+	if len(e.config.HTTPServer.Configs) > 0 {
+		for i := range e.config.HTTPServer.Configs {
+			if e.config.HTTPServer.Configs[i].Name == "metric" || e.config.HTTPServer.Configs[i].Name == "metrics" {
+				port = e.config.HTTPServer.Configs[i].Port
+			}
+		}
+	}
+	if len(port) <= 0 {
+		port = "9090"
+	}
+	if !strings.HasPrefix(port, ":") {
+		port = fmt.Sprintf(":%s", port)
+	}
+	return port
+}
+
+// New engin
+func New() *App {
+	// close gin log
 	gin.DefaultWriter = ioutil.Discard
-	e := NewEngine()
+	e := newApp()
 	return e
 }
 
-// NewEngine new engine
-func NewEngine() *Engine {
+// newApp new engine
+func newApp() *App {
+	// default log
+	SetDefaultLog()
 
 	// step 1:  config
-	conf := NewConfig()
+	conf := LoadConfig()
 
 	// step 2:  log
 	logger := NewLogger(conf)
@@ -56,13 +97,15 @@ func NewEngine() *Engine {
 	newRedisServers(conf)
 	redisConns := GetRedisConn()
 
-	e := &Engine{
+	e := &App{
 		Engine:       defaultEngine(),
 		log:          logger,
 		config:       conf,
 		dbClients:    mysqlConns,
 		redisClients: redisConns,
 	}
+	// common trace id
+	e.NewLogEntry()
 	e.Use(TraceFunc())
 	e.Use(LoggerFunc())
 	return e
@@ -73,9 +116,9 @@ func defaultEngine() *gin.Engine {
 	return r
 }
 
-func (e *Engine) createContext(c *gin.Context) *Context {
-	traceID := c.GetHeader(TraceID)
-	l := e.log.WithField(TraceID, traceID)
+func (e *App) createContext(c *gin.Context) *Context {
+	traceID := c.GetHeader(TraceIDKey)
+	l := e.log.WithField(TraceIDKey, traceID)
 	return &Context{
 		Context:      c,
 		config:       e.config,
@@ -86,7 +129,7 @@ func (e *Engine) createContext(c *gin.Context) *Context {
 }
 
 // GET get method
-func (e *Engine) GET(relativePath string, handler func(c *Context)) {
+func (e *App) GET(relativePath string, handler func(c *Context)) {
 	e.Engine.GET(relativePath, func(c *gin.Context) {
 		ctx := e.createContext(c)
 		handler(ctx)
@@ -94,7 +137,7 @@ func (e *Engine) GET(relativePath string, handler func(c *Context)) {
 }
 
 // POST post method
-func (e *Engine) POST(relativePath string, handler func(c *Context)) {
+func (e *App) POST(relativePath string, handler func(c *Context)) {
 	e.Engine.POST(relativePath, func(c *gin.Context) {
 		ctx := e.createContext(c)
 		handler(ctx)
@@ -102,7 +145,7 @@ func (e *Engine) POST(relativePath string, handler func(c *Context)) {
 }
 
 // PUT http put method
-func (e *Engine) PUT(relativePath string, handler func(c *Context)) {
+func (e *App) PUT(relativePath string, handler func(c *Context)) {
 	e.Engine.PUT(relativePath, func(c *gin.Context) {
 		ctx := e.createContext(c)
 		handler(ctx)
@@ -110,7 +153,7 @@ func (e *Engine) PUT(relativePath string, handler func(c *Context)) {
 }
 
 // PATCH  http patch method
-func (e *Engine) PATCH(relativePath string, handler func(c *Context)) {
+func (e *App) PATCH(relativePath string, handler func(c *Context)) {
 	e.Engine.PATCH(relativePath, func(c *gin.Context) {
 		ctx := e.createContext(c)
 		handler(ctx)
@@ -118,7 +161,7 @@ func (e *Engine) PATCH(relativePath string, handler func(c *Context)) {
 }
 
 // DELETE http delete method
-func (e *Engine) DELETE(relativePath string, handler func(c *Context)) {
+func (e *App) DELETE(relativePath string, handler func(c *Context)) {
 	e.Engine.DELETE(relativePath, func(c *gin.Context) {
 		ctx := e.createContext(c)
 		handler(ctx)
@@ -126,7 +169,7 @@ func (e *Engine) DELETE(relativePath string, handler func(c *Context)) {
 }
 
 // HEAD http head method
-func (e *Engine) HEAD(relativePath string, handler func(c *Context)) {
+func (e *App) HEAD(relativePath string, handler func(c *Context)) {
 	e.Engine.HEAD(relativePath, func(c *gin.Context) {
 		ctx := e.createContext(c)
 		handler(ctx)
@@ -134,6 +177,6 @@ func (e *Engine) HEAD(relativePath string, handler func(c *Context)) {
 }
 
 func getTraceIDFromContext(ctx context.Context) string {
-	traceID := ctx.Value(TraceID)
+	traceID := ctx.Value(TraceIDKey)
 	return traceID.(string)
 }

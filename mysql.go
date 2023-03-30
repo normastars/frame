@@ -16,6 +16,9 @@ import (
 
 var mysqlOnce sync.Once
 
+// Dialect defines dialect for mysql
+const Dialect = "mysql"
+
 // DBMultiClient multi db conns
 type DBMultiClient struct {
 	clients map[string]*gorm.DB
@@ -25,16 +28,12 @@ var dbMultiConn = &DBMultiClient{
 	clients: map[string]*gorm.DB{},
 }
 
-// GetMySQLConn 获取 mysql 连接
+// GetMySQLConn return mysql client list
 func GetMySQLConn() *DBMultiClient {
 	return dbMultiConn
 }
 
-// Dialect defines dialect for mysql
-const Dialect = "mysql"
-
 func newMySQLServers(conf *Config) {
-	// 只会初始化一次
 	mysqlOnce.Do(func() {
 		if len(conf.Mysql.Configs) > 0 && conf.Mysql.Enable {
 			for _, v := range conf.Mysql.Configs {
@@ -73,6 +72,7 @@ func open(logLevel, logMode string, item MySQLConfigItem) *gorm.DB {
 	if err == nil {
 		return dbConn
 	}
+
 	if item.EnableAutoMigrate && strings.Contains(err.Error(), "Unknown database") {
 		// auto migrate database
 		err = createDatabase(item.User, item.Password, item.Host, item.Database)
@@ -102,17 +102,18 @@ func createDatabase(user, password, host, database string) error {
 	return nil
 }
 
-// createDatabaseSQL 创建数据库
+// createDatabaseSQL create database
 func createDatabaseSQL(database string) string {
 	return fmt.Sprintf("CREATE DATABASE %s CHARACTER SET utf8 COLLATE utf8_general_ci", database)
 }
 
 type gormLogger struct {
-	Log *logrus.Logger
+	Log     *logrus.Logger
+	Disable bool
 }
 
 func newGormLogger(config *Config) logger.Interface {
-	return &gormLogger{Log: NewLogger(config)}
+	return &gormLogger{Log: NewLogger(config), Disable: config.Mysql.DisableReqLog}
 }
 
 func (l *gormLogger) LogMode(level logger.LogLevel) logger.Interface {
@@ -120,33 +121,45 @@ func (l *gormLogger) LogMode(level logger.LogLevel) logger.Interface {
 }
 
 func (l *gormLogger) Info(ctx context.Context, msg string, data ...interface{}) {
+	if l.Disable {
+		return
+	}
 	l.Log.WithFields(logrus.Fields{
-		TraceID: getTraceIDFromContext(ctx),
+		TraceIDKey: getTraceIDFromContext(ctx),
 	}).Infof(msg, data...)
 }
 
 func (l *gormLogger) Warn(ctx context.Context, msg string, data ...interface{}) {
+	if l.Disable {
+		return
+	}
 	l.Log.WithFields(logrus.Fields{
-		TraceID: getTraceIDFromContext(ctx),
+		TraceIDKey: getTraceIDFromContext(ctx),
 	}).Warnf(msg, data...)
 }
 
 func (l *gormLogger) Error(ctx context.Context, msg string, data ...interface{}) {
+	if l.Disable {
+		return
+	}
 	l.Log.WithFields(logrus.Fields{
-		TraceID: getTraceIDFromContext(ctx),
+		TraceIDKey: getTraceIDFromContext(ctx),
 	}).Errorf(msg, data...)
 }
 
 func (l *gormLogger) Trace(ctx context.Context, begin time.Time, fc func() (string, int64), err error) {
+	if l.Disable {
+		return
+	}
 	if err != nil {
 		l.Log.WithFields(logrus.Fields{
-			TraceID:    getTraceIDFromContext(ctx),
+			TraceIDKey: getTraceIDFromContext(ctx),
 			"duration": time.Since(begin).Milliseconds(),
 			"error":    err.Error(),
 		}).Error(fc())
 	} else {
 		l.Log.WithFields(logrus.Fields{
-			TraceID:    getTraceIDFromContext(ctx),
+			TraceIDKey: getTraceIDFromContext(ctx),
 			"duration": time.Since(begin).Milliseconds(), //
 		}).Infoln(fc())
 	}

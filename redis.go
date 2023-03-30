@@ -55,17 +55,21 @@ func openRedis(item RedisConfigItem) {
 
 // Define a custom logging hook
 type redisLogHook struct {
-	Log *logrus.Logger
+	Log     *logrus.Logger
+	Disable bool
 }
 
 func newRedisLogHook(config *Config) redis.Hook {
-	return &redisLogHook{Log: NewLogger(config)}
+	return &redisLogHook{Log: NewLogger(config), Disable: config.Redis.DisableReqLog}
 }
 
 // BeforeProcess logs the command before it is processed
 func (l redisLogHook) BeforeProcess(ctx context.Context, cmd redis.Cmder) (context.Context, error) {
+	if l.Disable {
+		return ctx, nil
+	}
 	l.Log.WithFields(logrus.Fields{
-		TraceID: getTraceIDFromContext(ctx),
+		TraceIDKey: getTraceIDFromContext(ctx),
 	}).Infof("Redis command: %s", cmd.String())
 	return ctx, nil
 }
@@ -77,6 +81,9 @@ func (l redisLogHook) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
 
 // BeforeProcessPipeline logs the commands before they are processed in a pipeline
 func (l redisLogHook) BeforeProcessPipeline(ctx context.Context, cmds []redis.Cmder) (context.Context, error) {
+	if l.Disable {
+		return ctx, nil
+	}
 	cmdstr := []string{}
 	for _, cmd := range cmds {
 		cmdstr = append(cmdstr, cmd.String())
@@ -85,7 +92,7 @@ func (l redisLogHook) BeforeProcessPipeline(ctx context.Context, cmds []redis.Cm
 		return ctx, nil
 	}
 	l.Log.WithFields(logrus.Fields{
-		TraceID: getTraceIDFromContext(ctx),
+		TraceIDKey: getTraceIDFromContext(ctx),
 	}).Infof("Redis pipeline commands: %s", strings.Join(cmdstr, " "))
 	return ctx, nil
 }

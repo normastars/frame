@@ -3,6 +3,7 @@ package frame
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"path"
 	"runtime"
@@ -12,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 	"gorm.io/gorm/logger"
 )
 
@@ -21,8 +23,8 @@ var defaultJSONLogFormatter = &logrus.JSONFormatter{
 	},
 }
 
-// init config project logrus log
-func init() {
+// SetDefaultLog config project logrus log
+func SetDefaultLog() {
 	// default log config
 	logrus.SetReportCaller(true)
 	// set file name
@@ -43,7 +45,7 @@ func NewLogger(conf ...*Config) *logrus.Logger {
 func newLoggerLevel(level, mode string) *logrus.Logger {
 	logger := logrus.New()
 	logger.SetReportCaller(true)
-	if mode == "" || mode == "json" {
+	if mode == "" || mode == ModeJSON {
 		logger.SetFormatter(defaultJSONLogFormatter)
 	}
 	if len(level) <= 0 {
@@ -53,22 +55,6 @@ func newLoggerLevel(level, mode string) *logrus.Logger {
 	// set log level, default info level
 	logger.SetLevel(log2Level(level))
 	return logger
-}
-
-var logm = map[string]logrus.Level{
-	"panic": logrus.PanicLevel,
-	"fatal": logrus.FatalLevel,
-	"error": logrus.ErrorLevel,
-	"warn":  logrus.WarnLevel,
-	"info":  logrus.InfoLevel,
-	"debug": logrus.DebugLevel,
-	"trace": logrus.TraceLevel,
-}
-
-var gormLogm = map[string]logger.LogLevel{
-	"error": logger.Error,
-	"warn":  logger.Warn,
-	"info":  logger.Info,
 }
 
 func log2gormLevel(l string) logger.LogLevel {
@@ -94,9 +80,11 @@ func log2Level(l string) logrus.Level {
 // LoggerFunc log func
 func LoggerFunc() HandlerFunc {
 	return func(c *Context) {
-		// 记录请求开始时间
+
+		// request start
 		startTime := time.Now()
-		// 请求body内容处理
+
+		//  request body
 		var requestBody string
 		if c.Request.Body != nil {
 			bodyBytes, err := ioutil.ReadAll(c.Request.Body)
@@ -105,47 +93,80 @@ func LoggerFunc() HandlerFunc {
 			} else {
 				requestBody = string(bodyBytes)
 			}
-			// 重置Body内容
+
+			// reset body
 			c.Request.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 		}
 
-		// 处理请求header
+		// request header
 		requestHeader := make(map[string]string)
 		for k, v := range c.Request.Header {
 			requestHeader[k] = strings.Join(v, ",")
 		}
 
-		// 处理响应body内容
+		// response body
 		w := &responseWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Context.Writer}
 		c.Context.Writer = w
 
-		// 继续处理请求
+		// detail request
 		c.Next()
 
-		// 记录请求结束时间
+		// request end
 		endTime := time.Now()
-		// 日志记录
-		reqLog := logBody{
-			RequestID:  c.Request.Header.Get(TraceID),
-			Code:       "X001",
-			StatusCode: c.Context.Writer.Status(),
-			Duration:   endTime.Sub(startTime).Milliseconds(),
-			Msg:        "XTODO",
-			Path:       c.Request.URL.Path,
-			Extra: reqLogExtra{
-				Req: reqLogBody{
-					// Header: requestHeader,
-					Body: requestBody,
-				},
-				Resp: respLogBody{
-					Body: w.body.String(),
-				},
-			},
+		duration := endTime.Sub(startTime).Milliseconds()
+		// log body
+		rb := w.body.String()
+		if !isJSONBody(w) {
+			return
 		}
-		byts, _ := json.Marshal(reqLog)
-		c.Errorln("richardyu")
-		c.Infoln(string(byts))
+		go func() {
+			httpCode := c.Context.Writer.Status()
+			hcr := fmt.Sprintf("%d", httpCode)
+			busCode := jsonGet(rb, codeKey)
+			method := c.Context.Request.Method
+			url := c.Request.URL.Path
+
+			if c.config.EnableMetric {
+				// metrics
+				prometheusRequestDuration.WithLabelValues(url, hcr, method).Observe(float64(duration))
+				prometheusRequestBusCounter.WithLabelValues(url, busCode, method).Inc()
+			}
+			if c.config.HTTPServer.DisableReqLog {
+				return
+			}
+			reqLog := logBody{
+				RequestID:  c.Request.Header.Get(TraceIDKey),
+				Code:       busCode,
+				StatusCode: c.Context.Writer.Status(),
+				Duration:   duration,
+				Msg:        jsonGet(rb, msgKey),
+				Path:       c.Request.URL.Path,
+				Extra: reqLogExtra{
+					Req: reqLogBody{
+						// Header: requestHeader,
+						Body: requestBody,
+					},
+					Resp: respLogBody{
+						Body: w.body.String(),
+					},
+				},
+			}
+			byts, _ := json.Marshal(reqLog)
+			c.Infoln(string(byts))
+		}()
 	}
+}
+
+func jsonGet(data string, key string) string {
+	return gjson.Get(data, key).String()
+}
+
+func isJSONBody(w gin.ResponseWriter) bool {
+	t := w.Header().Get("Content-Type")
+	if strings.Contains(t, "application/json") {
+		return true
+	}
+	return false
 }
 
 type responseWriter struct {

@@ -23,15 +23,7 @@ type PageResults struct {
 	Results  []interface{} `json:"results,omitempty"`
 }
 
-var (
-	successMsg       = "ok"
-	successCode      = "0"
-	defaultEmptyPage = PageResults{
-		Results: make([]interface{}, 0),
-	}
-)
-
-// Success http response 响应成功时使用
+// Success http response ok
 // default json
 func (ctx *Context) Success(data interface{}) {
 	resp := &Response{
@@ -45,11 +37,11 @@ func (ctx *Context) Success(data interface{}) {
 
 // ErrorMsg frame err msg
 type ErrorMsg interface {
-	// 错误码
+	// error  code
 	GetCode() string
-	// 真实原因, 仅用于打印日志
+	// real error message, only log
 	GetReal() string
-	// 对客户描述,对外返回
+	// user reply
 	GetReply() string
 }
 
@@ -100,8 +92,8 @@ func (ctx *Context) printRealMsgLog(realMsg string) {
 	}
 }
 
-// HTTPListSuccess 如果 pageData 是nil 或者 pageData.Results 是空,自动设置为空数组[]
-// http response 结果集是数组或切片时使用
+// HTTPListSuccess if pageData nil or pageData.Results id empty,auto set []
+// http response data or date.results is slice or array
 // default json
 func (ctx *Context) HTTPListSuccess(pageData *PageResults) {
 	emptyPage(pageData)
@@ -115,8 +107,8 @@ func (ctx *Context) HTTPListSuccess(pageData *PageResults) {
 	ctx.JSON(http.StatusOK, resp)
 }
 
-// HTTPListError 自动将结果集设置为空数组
-// http response 结果集是数组或切片时使用
+// HTTPListError if pageData nil or pageData.Results id empty,auto set []
+// http response data or date.results is slice or array
 // default json
 func (ctx *Context) HTTPListError(errMsg ErrorMsg) {
 	resp := &Response{
@@ -149,8 +141,8 @@ func (m *realMsg) String() string {
 	return string(b)
 }
 
-// HTTPListError2 自动将结果集设置为空数组
-// http response 结果集是数组或切片时使用
+// HTTPListError2 if pageData nil or pageData.Results id empty,auto set []
+// http response data or date.results is slice or array
 // default json
 func (ctx *Context) HTTPListError2(httpCode int, errMsg ErrorMsg) {
 	resp := &Response{

@@ -1,46 +1,48 @@
 {
     "project":"nomainc",
     "log_level":"info",
-    "log_mode": "text",
+    "log_mode":"text",
     "enable_metric":true,
     "env":"dev",
     "http_server":{
         "enable":true,
+        "disable_req_log":false,
         "configs":[
-           {
-            "name":"server",
-            "port":":8080"
-           },
-           {
-            "name":"metrics",
-            "port":":9090"
-           } 
+            {
+                "name":"server",
+                "port":":8080"
+            },
+            {
+                "name":"metrics",
+                "port":":9090"
+            }
         ]
     },
     "mysql":{
         "enable":true,
+        "disable_req_log":true,
         "configs":[
             {
                 "name":"user",
-                "default":true,
                 "enable":true,
+                "enable_auto_migrate":true,
                 "host":"127.0.0.1:3309",
                 "database":"user",
                 "user":"root",
                 "password":"root",
-                "slow_threshold_sec": 3,
-                "enable_auto_migrate":true
+                "slow_threshold_sec":3
             }
         ]
     },
     "redis":{
-        "enable": true,
+        "enable":true,
+        "disable_req_log":true,
         "configs":[
             {
                 "name":"user",
-                "default":true,
                 "enable":true,
                 "host":"127.0.0.1:6380",
+                "pool_size":0,
                 "password":"",
                 "db":0
             }

@@ -10,7 +10,7 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-// Context 获取 frame 上下文
+// Context frame context
 type Context struct {
 	*gin.Context
 	config       *Config
@@ -19,8 +19,9 @@ type Context struct {
 	*logrus.Entry
 }
 
+// GetTraceID return trace id from context
 func (c *Context) GetTraceID() string {
-	return c.Context.GetHeader(TraceID)
+	return c.Context.GetHeader(TraceIDKey)
 }
 
 func (c *Context) getGormLogger() logger.Interface {
@@ -29,50 +30,65 @@ func (c *Context) getGormLogger() logger.Interface {
 
 // WithTraceContext return context
 func (c *Context) WithTraceContext() context.Context {
-	return context.WithValue(context.Background(), TraceID, c.GetHeader(TraceID))
+	id := c.GetHeader(TraceIDKey)
+	pc := context.Background()
+	return context.WithValue(pc, TraceIDKey, id)
 }
 
 // GetDB get db client
-func (ctx *Context) GetDB(name ...string) *gorm.DB {
+func (c *Context) GetDB(name ...string) *gorm.DB {
 	// default mysql client
-	if len(ctx.dbClients.clients) == 1 && len(name) == 0 {
-		for _, v := range ctx.dbClients.clients {
-			v = v.WithContext(ctx.WithTraceContext())
-			v.Logger = ctx.getGormLogger()
+	if len(c.dbClients.clients) == 1 && len(name) == 0 {
+		for _, v := range c.dbClients.clients {
+			v = v.WithContext(c.WithTraceContext())
+			v.Logger = c.getGormLogger()
 			return v
 		}
 	}
+	// panic when db
 	if len(name) == 0 {
 		panic("db client can't find, db name is empty")
 	}
-	db := ctx.dbClients.clients[name[0]]
+	db := c.dbClients.clients[name[0]]
 	if db != nil {
-		db = db.WithContext(ctx.WithTraceContext())
-		db.Logger = ctx.getGormLogger()
+		db = db.WithContext(c.WithTraceContext())
+		db.Logger = c.getGormLogger()
 	}
 	return db
 }
 
 // GetRedis get redis client
-func (ctx *Context) GetRedis(name ...string) *redis.Client {
+func (c *Context) GetRedis(name ...string) *redis.Client {
 	// default redis client
-	if len(ctx.redisClients.clients) == 1 && len(name) == 0 {
-		for _, v := range ctx.redisClients.clients {
-			v = v.WithContext(ctx.WithTraceContext())
-			v.AddHook(newRedisLogHook(ctx.config))
+	if len(c.redisClients.clients) == 1 && len(name) == 0 {
+		for _, v := range c.redisClients.clients {
+			v = v.WithContext(c.WithTraceContext())
+			v.AddHook(newRedisLogHook(c.config))
 			return v
 		}
 	}
 	if len(name) == 0 {
 		panic("redis client can't find, redis name is empty")
 	}
-	r := ctx.redisClients.clients[name[0]]
-	r = r.WithContext(ctx.WithTraceContext())
-	r.AddHook(newRedisLogHook(ctx.config))
+	r := c.redisClients.clients[name[0]]
+	r = r.WithContext(c.WithTraceContext())
+	r.AddHook(newRedisLogHook(c.config))
 	return r
 }
 
-func (ctx *Context) GetLogger() *logrus.Entry {
-	traceID := ctx.GetHeader(TraceID)
-	return ctx.Entry.WithField(TraceID, traceID)
+// GetSetTraceHeader get trace_id from header, will set trace_id in header when header trace_id is empty
+func (c *Context) GetSetTraceHeader() string {
+	traceID := c.GetHeader(TraceIDKey)
+	if len(traceID) > 0 {
+		return traceID
+	}
+	traceID = generalTraceID(c.config.Project)
+	c.Context.Header(TraceIDKey, traceID)
+	return traceID
+}
+
+// GetLogger get ctx log
+func (c *Context) GetLogger() *logrus.Entry {
+	traceID := c.GetSetTraceHeader()
+	return c.Entry.WithField(TraceIDKey, traceID)
 }
