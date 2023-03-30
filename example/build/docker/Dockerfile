@@ -1,4 +1,4 @@
-FROM golang:1.16 as builder
+FROM golang:1.17 as builder
 WORKDIR /usr/src/app
 ENV GOPROXY=https://goproxy.cn
 # COPY go.mod ./
@@ -6,7 +6,7 @@ ENV GOPROXY=https://goproxy.cn
 # COPY manifest ./
 # RUN go mod download
 COPY . .
-RUN make build-min-docker
+RUN make build
 
 FROM scratch as server
 WORKDIR /opt/app

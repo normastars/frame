@@ -14,7 +14,7 @@ build-min-docker:
 	make clean
 	make linux
 	# TODO: need fix <registername> and <imagename>
-	docker build -t registername/imagename:v1 -f ./build/docker/Dockerfile .
+	docker build -t nomainc/frame/example:v2 -f build/docker/Dockerfile .
 clean: ## Remove previous build
 	rm -rf bin
 	rm -rf manifest.txt
