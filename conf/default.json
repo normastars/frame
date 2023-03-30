@@ -1,6 +1,7 @@
 {
     "project":"nomainc",
-    "level":"info",
+    "log_level":"info",
+    "log_mode": "json",
     "enable_metric":true,
     "env":"dev",
     "http_server":{

@@ -13,8 +13,8 @@ type gormLogger struct {
 	TraceID string
 }
 
-func newGormLogger(traceID string) logger.Interface {
-	return &gormLogger{Log: logrus.New(), TraceID: traceID}
+func newGormLogger(traceID string, config *Config) logger.Interface {
+	return &gormLogger{Log: NewLogger(config), TraceID: traceID}
 }
 
 func (l *gormLogger) LogMode(level logger.LogLevel) logger.Interface {
@@ -43,13 +43,13 @@ func (l *gormLogger) Trace(ctx context.Context, begin time.Time, fc func() (stri
 	if err != nil {
 		l.Log.WithFields(logrus.Fields{
 			TraceID:    getTraceIDFromContext(ctx),
-			"duration": time.Since(begin).String(),
+			"duration": time.Since(begin).Milliseconds(),
 			"error":    err.Error(),
 		}).Error(fc())
 	} else {
 		l.Log.WithFields(logrus.Fields{
 			TraceID:    getTraceIDFromContext(ctx),
-			"duration": time.Since(begin).String(),
+			"duration": time.Since(begin).Milliseconds(), //
 		}).Infoln(fc())
 	}
 }

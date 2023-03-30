@@ -1,10 +1,9 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/nomainc/frame"
 	"github.com/nomainc/frame/version"
+	"github.com/sirupsen/logrus"
 )
 
 type User struct {
@@ -13,9 +12,9 @@ type User struct {
 }
 
 func main() {
-	fmt.Printf("commit: %20s\n", version.GitCommit)
-	fmt.Printf("built on %20s\n", version.BuildGoVersion)
-	fmt.Printf("built on %20s\n", version.BuildSystem)
+	logrus.Infof("commit: %20s\n", version.GitCommit)
+	logrus.Infof("built on %20s\n", version.BuildGoVersion)
+	logrus.Infof("built on %20s\n", version.BuildSystem)
 	router := frame.Default()
 	router.GET("/hello", func(ctx *frame.Context) {
 		db := ctx.GetDB("user")
@@ -31,7 +30,7 @@ func main() {
 		if result.Error != nil {
 			ctx.Fatalf("failed to create user: %v", result.Error)
 		}
-		fmt.Printf("created user: %v\n", user)
+		ctx.Infof("created user: %v\n", user)
 
 		// 查询用户
 		var foundUser User
@@ -39,14 +38,14 @@ func main() {
 		if result.Error != nil {
 			ctx.Fatalf("failed to find user: %v", result.Error)
 		}
-		fmt.Printf("found user: %v\n", foundUser)
+		ctx.Infof("found user: %v\n", foundUser)
 
 		// 更新用户
 		result = db.Model(&foundUser).Update("name", "updated_user")
 		if result.Error != nil {
 			ctx.Fatalf("failed to update user: %v", result.Error)
 		}
-		fmt.Printf("updated user: %v\n", foundUser)
+		ctx.Infof("updated user: %v\n", foundUser)
 
 		// 删除用户
 		result = db.Delete(&foundUser)

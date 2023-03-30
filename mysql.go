@@ -36,7 +36,7 @@ func newMySQLServers(conf *Config) {
 	mysqlOnce.Do(func() {
 		if len(conf.Mysql.Configs) > 0 && conf.Mysql.Enable {
 			for _, v := range conf.Mysql.Configs {
-				conn := open(conf.Level, v)
+				conn := open(conf.LogLevel, conf.LogMode, v)
 				if conn != nil {
 					// add connection map
 					dbMultiConn.clients[v.Name] = conn
@@ -47,13 +47,13 @@ func newMySQLServers(conf *Config) {
 	})
 }
 
-func open(logLevel string, item MySQLConfigItem) *gorm.DB {
+func open(logLevel, logMode string, item MySQLConfigItem) *gorm.DB {
 	if !item.Enable {
 		return nil
 	}
 	dsn := fmt.Sprintf("%s:%s@(%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", item.User, item.Password, item.Host, item.Database)
 	// Initialize a new logger instance
-	l := newLoggerLevel(logLevel)
+	l := newLoggerLevel(logLevel, logMode)
 	// Set the GORM logger to the new logger instance
 	slowSec := 0
 	if item.SlowThresholdSec > 0 {
@@ -62,9 +62,9 @@ func open(logLevel string, item MySQLConfigItem) *gorm.DB {
 	dbLogger := logger.New(
 		l,
 		logger.Config{
-			SlowThreshold: time.Duration(slowSec) * time.Second,
-			LogLevel:      log2gormLevel(logLevel),
-			Colorful:      true,
+			SlowThreshold:             time.Duration(slowSec) * time.Second,
+			LogLevel:                  log2gormLevel(logLevel),
+			IgnoreRecordNotFoundError: true,
 		},
 	)
 	dbConn, err := gorm.Open(mysql.Open(dsn), &gorm.Config{Logger: dbLogger})

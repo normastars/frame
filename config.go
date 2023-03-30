@@ -9,7 +9,8 @@ import (
 // Config project config
 type Config struct {
 	Project      string      `json:"project"`
-	Level        string      `json:"level"`
+	LogLevel     string      `json:"log_level" mapstructure:"log_level"`
+	LogMode      string      `json:"log_mode" mapstructure:"log_mode"`
 	EnableMetric bool        `json:"enable_metric" yaml:"enable_metric" mapstructure:"enable_metric"`
 	Env          string      `json:"env"`
 	HTTPServer   HTTPServer  `json:"http_server" yaml:"http_server" mapstructure:"http_server"`

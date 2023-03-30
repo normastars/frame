@@ -16,16 +16,20 @@ import (
 // NewLogger new logger
 func NewLogger(conf ...*Config) *logrus.Logger {
 	var l string
+	var m string
 	if len(conf) > 0 {
-		l = conf[0].Level
+		l = conf[0].LogLevel
+		m = conf[0].LogMode
 	}
-	return newLoggerLevel(l)
+	return newLoggerLevel(l, m)
 }
 
-func newLoggerLevel(level string) *logrus.Logger {
+func newLoggerLevel(level, mode string) *logrus.Logger {
 	logger := logrus.New()
 	logger.SetReportCaller(true)
-	logger.SetFormatter(defaultLogFormatter)
+	if mode == "" || mode == "json" {
+		logger.SetFormatter(defaultJSONLogFormatter)
+	}
 	if len(level) <= 0 {
 		logger.SetLevel(logrus.DebugLevel)
 		return logger
@@ -72,8 +76,8 @@ func log2Level(l string) logrus.Level {
 }
 
 // LoggerFunc log func
-func LoggerFunc() gin.HandlerFunc {
-	return func(c *gin.Context) {
+func LoggerFunc() HandlerFunc {
+	return func(c *Context) {
 		// 记录请求开始时间
 		startTime := time.Now()
 		// 请求body内容处理
@@ -96,21 +100,20 @@ func LoggerFunc() gin.HandlerFunc {
 		}
 
 		// 处理响应body内容
-		w := &responseWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Writer}
-		c.Writer = w
+		w := &responseWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Context.Writer}
+		c.Context.Writer = w
 
 		// 继续处理请求
 		c.Next()
 
 		// 记录请求结束时间
 		endTime := time.Now()
-
 		// 日志记录
 		reqLog := logBody{
 			RequestID:  c.Request.Header.Get(TraceID),
 			Code:       "X001",
-			StatusCode: c.Writer.Status(),
-			Latency:    endTime.Sub(startTime).Microseconds(),
+			StatusCode: c.Context.Writer.Status(),
+			Duration:   endTime.Sub(startTime).Milliseconds(),
 			Msg:        "XTODO",
 			Path:       c.Request.URL.Path,
 			Extra: reqLogExtra{
@@ -124,9 +127,8 @@ func LoggerFunc() gin.HandlerFunc {
 			},
 		}
 		byts, _ := json.Marshal(reqLog)
-
-		log.Errorln("richardyu")
-		log.Infoln(string(byts))
+		c.Errorln("richardyu")
+		c.Infoln(string(byts))
 	}
 }
 
@@ -144,7 +146,7 @@ type logBody struct {
 	RequestID  string      `json:"request_id,omitempty"`
 	Code       string      `json:"code,omitempty"`
 	StatusCode int         `json:"statusCode,omitempty"`
-	Latency    int64       `json:"latency,omitempty"` // ms
+	Duration   int64       `json:"duration,omitempty"` // ms
 	Msg        string      `json:"msg,omitempty"`
 	Path       string      `json:"path,omitempty"`
 	Extra      reqLogExtra `json:"extra,omitempty"`

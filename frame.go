@@ -1,7 +1,6 @@
 package frame
 
 import (
-	"fmt"
 	"io/ioutil"
 
 	"github.com/gin-gonic/gin"
@@ -19,7 +18,7 @@ import (
 // Engine frame engine
 type Engine struct {
 	*gin.Engine
-	config       Config
+	config       *Config
 	dbClients    *DBMultiClient
 	redisClients *RedisMultiClient
 	log          *logrus.Logger
@@ -58,21 +57,22 @@ func NewEngine() *Engine {
 
 	// 初始化 logrus 日志包
 
-	fmt.Println("初始化日志包")
-
-	return &Engine{
+	e := &Engine{
 		Engine:       defaultEngine(),
 		log:          logger,
-		config:       *conf,
+		config:       conf,
 		dbClients:    mysqlConns,
 		redisClients: redisConns,
 	}
+	e.Use(TraceFunc())
+	e.Use(LoggerFunc())
+	return e
 }
 
 func defaultEngine() *gin.Engine {
 	r := gin.Default()
-	r.Use(TraceFunc())
-	r.Use(LoggerFunc())
+	// r.Use(TraceFunc())
+	// r.Use(LoggerFunc())
 	return r
 }
 
@@ -82,7 +82,7 @@ func (e *Engine) createContext(c *gin.Context) *Context {
 	l := e.log.WithField(TraceID, traceID)
 	return &Context{
 		Context:      c,
-		config:       &e.config,
+		config:       e.config,
 		redisClients: e.redisClients,
 		dbClients:    e.dbClients,
 		Entry:        l,
@@ -90,9 +90,9 @@ func (e *Engine) createContext(c *gin.Context) *Context {
 }
 
 // Use middleware
-func (e *Engine) Use(middleware ...gin.HandlerFunc) {
-	e.Engine.Use(middleware...)
-}
+// func (e *Engine) Use(middleware ...gin.HandlerFunc) {
+// 	e.Engine.Use(middleware...)
+// }
 
 // GET get method
 func (e *Engine) GET(relativePath string, handler func(c *Context)) {
