@@ -37,3 +37,13 @@ var (
 		Results: make([]interface{}, 0),
 	}
 )
+
+// config type
+var (
+	configTypeYaml    = "yaml"
+	configTypeYal     = "yml"
+	configTypeJSON    = "json" // default json
+	configPath        = "CONFPATH"
+	configType        = "CONFTYPE" // default ./conf/default.json
+	configDefaultPath = "./conf/default.json"
+)

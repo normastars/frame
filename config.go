@@ -1,11 +1,11 @@
 package frame
 
 import (
-	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 
 	"github.com/spf13/viper"
-	"gopkg.in/yaml.v3"
 )
 
 // Config project config
@@ -71,22 +71,37 @@ type RedisConfigItem struct {
 
 // LoadConfig read config
 func LoadConfig() *Config {
-	path := "./conf/default.yaml"
+	_, path := getConfigFromEnv()
 	viper.SetConfigFile(path)
-	// 读取配置文件并检查错误
 	err := viper.ReadInConfig()
 	if err != nil {
-		panic(fmt.Errorf("配置文件读取错误: %s", err))
+		panic(fmt.Errorf("read config err: %s", err))
 	}
+
 	c := &Config{}
 	if err := viper.Unmarshal(c); err != nil {
 		panic(err)
 	}
-	jb, _ := json.Marshal(c)
-
-	fmt.Println(string(jb))
-	fmt.Println("=====")
-	yb, _ := yaml.Marshal(c)
-	fmt.Println(string(yb))
+	if err := c.Validate(); err != nil {
+		panic(err)
+	}
 	return c
+}
+
+// Validate validate config
+func (c *Config) Validate() error {
+	// TODO: check config
+	return nil
+}
+
+func getConfigFromEnv() (t, path string) {
+	path = os.Getenv(configPath)
+	if len(path) <= 0 {
+		path = configDefaultPath
+	}
+	if strings.HasSuffix(path, configTypeYal) || strings.HasSuffix(path, configTypeYaml) {
+		t = configTypeYaml
+	}
+	t = configTypeJSON
+	return
 }

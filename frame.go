@@ -12,15 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// TODO LIST:
-// 1. gin.Context -> frame.Context 完成
-// 4. 跑通demo  完成
-// 2. 集成 Config 完成
-// 3. 优化 Redis,Mysql 连接,日志打印
-// 5. 集成 req 请求
-// 6. 优化 Log 包
-
-// Engine frame engine
+// App frame engine
 type App struct {
 	*gin.Engine
 	config       *Config
@@ -32,9 +24,9 @@ type App struct {
 
 // Run engin run
 // ":8080"
-func (e *App) Run(addr string) error {
+func (e *App) Run() error {
 	go e.metricRun()
-	return e.Engine.Run(addr)
+	return e.serverRun()
 }
 
 func (e *App) metricRun() {
@@ -46,10 +38,38 @@ func (e *App) metricRun() {
 		http.ListenAndServe(port, nil)
 	}
 }
+func (e *App) serverRun() error {
+	if e.config.HTTPServer.Enable {
+		// server port
+		port := e.getServerPort()
+		e.Engine.Run(port)
+		e.Infof("server listen %s", port)
+		return http.ListenAndServe(port, nil)
+	}
+	return nil
+}
 
 // NewLogEntry new log entry
 func (e *App) NewLogEntry() {
 	e.Entry = e.log.WithField(TraceIDKey, generalTraceID(e.config.Project))
+}
+
+func (e *App) getServerPort() string {
+	port := ""
+	if len(e.config.HTTPServer.Configs) > 0 {
+		for i := range e.config.HTTPServer.Configs {
+			if e.config.HTTPServer.Configs[i].Name != "metric" && e.config.HTTPServer.Configs[i].Name != "metrics" {
+				port = e.config.HTTPServer.Configs[i].Port
+			}
+		}
+	}
+	if len(port) <= 0 {
+		port = "8080"
+	}
+	if !strings.HasPrefix(port, ":") {
+		port = fmt.Sprintf(":%s", port)
+	}
+	return port
 }
 
 func (e *App) getMetricPort() string {
