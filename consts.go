@@ -12,20 +12,41 @@ const (
 	ModelText         = "text"
 )
 
+var (
+	logLevelTrace = "trace"
+	logLevelDebug = "debug"
+	logLevelInfo  = "info"
+	logLevelWarn  = "warn"
+	logLevelError = "error"
+	logLevelFatal = "fatal"
+	logLevelPanic = "panic"
+)
+
+var (
+	defaultMetricName  = "metric"
+	defaultMetricsName = "metrics"
+	defaultMetricPath  = "/metrics"
+	defaultMetricPort  = ":9090"
+	defaultMetricPort2 = "9090"
+	defaultBusName     = "server"
+	defaultBusPort     = "8080"
+	defaultBusPort2    = ":8080"
+)
+
 var logm = map[string]logrus.Level{
-	"panic": logrus.PanicLevel,
-	"fatal": logrus.FatalLevel,
-	"error": logrus.ErrorLevel,
-	"warn":  logrus.WarnLevel,
-	"info":  logrus.InfoLevel,
-	"debug": logrus.DebugLevel,
-	"trace": logrus.TraceLevel,
+	logLevelPanic: logrus.PanicLevel,
+	logLevelFatal: logrus.FatalLevel,
+	logLevelError: logrus.ErrorLevel,
+	logLevelWarn:  logrus.WarnLevel,
+	logLevelInfo:  logrus.InfoLevel,
+	logLevelDebug: logrus.DebugLevel,
+	logLevelTrace: logrus.TraceLevel,
 }
 
 var gormLogm = map[string]logger.LogLevel{
-	"error": logger.Error,
-	"warn":  logger.Warn,
-	"info":  logger.Info,
+	logLevelError: logger.Error,
+	logLevelWarn:  logger.Warn,
+	logLevelInfo:  logger.Info,
 }
 
 var (
@@ -47,3 +68,13 @@ var (
 	configType        = "CONFTYPE" // default ./conf/default.json
 	configDefaultPath = "./conf/default.json"
 )
+
+var defaultMetricHTTPConfig = HTTPServerConfig{
+	Name: defaultMetricName,
+	Port: defaultMetricPort2,
+}
+
+var defaultBusHTTPConfig = HTTPServerConfig{
+	Name: defaultBusName,
+	Port: defaultMetricPort2,
+}

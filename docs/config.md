@@ -3,56 +3,50 @@
 
 ```
 {
-    "project":"nomainc",
-    "log_level":"info",
-    "log_mode":"text",
-    "enable_metric":false,
-    "env":"dev",
-    "http_server":{
-        "enable":true,
-        "enable_cors":false,
-        "disable_req_log":false,
-        "configs":[
-            {
-                "name":"server",
-                "port":":8080"
-            },
-            {
-                "name":"metrics",
-                "port":":9090"
-            }
-        ]
-    },
-    "mysql":{
-        "enable":true,
-        "disable_req_log":true,
-        "configs":[
-            {
-                "name":"user",
-                "enable":true,
-                "enable_auto_migrate":true,
-                "host":"127.0.0.1:3309",
-                "database":"user",
-                "user":"root",
-                "password":"root",
-                "slow_threshold_sec":3
-            }
-        ]
-    },
-    "redis":{
-        "enable":true,
-        "disable_req_log":true,
-        "configs":[
-            {
-                "name":"user",
-                "enable":true,
-                "host":"127.0.0.1:6380",
-                "pool_size":0,
-                "password":"",
-                "db":0
-            }
-        ]
-    }
+	"project": "nomainc",
+	"log_level": "info",
+	"log_mode": "text",
+	"print_conf": true,
+	"enable_metric": true,
+	"env": "dev",
+	"http_server": {
+		"enable": true,
+		"enable_cors": false,
+		"disable_req_log": false,
+		"configs": [{
+			"name": "server",
+			"port": ":8080"
+		}, {
+			"name": "metrics",
+			"port": ":9090"
+		}]
+	},
+	"mysql": {
+		"enable": true,
+		"disable_req_log": true,
+		"configs": [{
+			"name": "user",
+			"enable": true,
+			"enable_auto_migrate": true,
+			"host": "127.0.0.1:3309",
+			"database": "user",
+			"user": "root",
+			"password": "root",
+			"slow_threshold_sec": 3
+		}]
+	},
+	"redis": {
+		"enable": true,
+		"disable_req_log": true,
+		"configs": [{
+			"name": "user",
+			"enable": true,
+			"host": "127.0.0.1:6380",
+			"pool_size": 0,
+			"password": "",
+			"db": 0
+		}]
+	}
 }
 ```
 
@@ -63,6 +57,7 @@
 | project | string | nomainc | 项目名称,必填 |
 | log_level | string | info | 日志级别,支持:debug,info,warn,error|
 | log_mode | string | json | 日志模式,json/text,默认:json |
+| print_conf | bool | false | 是否控制台打印加载后的日志内容 |
 | enable_metric | bool | false | 是否启用指标采集,默认:不采集 |
 | env | string | dev | 环境名称,必填项 |
 | http_server.enable | bool | false | 是否启动HTTP服务,默认不启动 |

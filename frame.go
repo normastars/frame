@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"strings"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -30,21 +30,26 @@ func (e *App) Run() error {
 }
 
 func (e *App) metricRun() {
-	if e.config.EnableMetric {
+	if e.config.EnableMetric && e.config.HTTPServer.Enable {
 		// metrics
 		port := e.getMetricPort()
-		http.Handle("/metrics", promhttp.Handler())
-		e.Infof("metric server listen %s", port)
-		http.ListenAndServe(port, nil)
+		fmt.Printf("%s server listen %s\n", defaultMetricName, port)
+		http.Handle(defaultMetricPath, promhttp.Handler())
+		if err := http.ListenAndServe(port, nil); err != nil {
+			fmt.Println(err.Error())
+			os.Exit(-1)
+		}
 	}
 }
 func (e *App) serverRun() error {
 	if e.config.HTTPServer.Enable {
 		// server port
 		port := e.getServerPort()
-		e.Engine.Run(port)
-		e.Infof("server listen %s", port)
-		return http.ListenAndServe(port, nil)
+		fmt.Printf("server listen %s\n", port)
+		if err := e.Engine.Run(port); err != nil {
+			fmt.Println(err.Error())
+			os.Exit(-1)
+		}
 	}
 	return nil
 }
@@ -55,39 +60,11 @@ func (e *App) NewLogEntry() {
 }
 
 func (e *App) getServerPort() string {
-	port := ""
-	if len(e.config.HTTPServer.Configs) > 0 {
-		for i := range e.config.HTTPServer.Configs {
-			if e.config.HTTPServer.Configs[i].Name != "metric" && e.config.HTTPServer.Configs[i].Name != "metrics" {
-				port = e.config.HTTPServer.Configs[i].Port
-			}
-		}
-	}
-	if len(port) <= 0 {
-		port = "8080"
-	}
-	if !strings.HasPrefix(port, ":") {
-		port = fmt.Sprintf(":%s", port)
-	}
-	return port
+	return e.config.getServerPort()
 }
 
 func (e *App) getMetricPort() string {
-	port := ""
-	if len(e.config.HTTPServer.Configs) > 0 {
-		for i := range e.config.HTTPServer.Configs {
-			if e.config.HTTPServer.Configs[i].Name == "metric" || e.config.HTTPServer.Configs[i].Name == "metrics" {
-				port = e.config.HTTPServer.Configs[i].Port
-			}
-		}
-	}
-	if len(port) <= 0 {
-		port = "9090"
-	}
-	if !strings.HasPrefix(port, ":") {
-		port = fmt.Sprintf(":%s", port)
-	}
-	return port
+	return e.config.getMetricPort()
 }
 
 // New engin

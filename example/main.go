@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/nomainc/frame"
 	"github.com/nomainc/frame/example/version"
@@ -35,27 +34,5 @@ func HelloWorld(c *frame.Context) {
 		c.Fatalf("failed to create user: %v", result.Error)
 	}
 	c.Infof("created user: %v\n", user)
-
-	// query user
-	var foundUser User
-	result = db.First(&foundUser, user.ID)
-	if result.Error != nil {
-		c.Fatalf("failed to find user: %v", result.Error)
-	}
-	c.Infof("found user: %v\n", foundUser)
-
-	// update user
-	result = db.Model(&foundUser).Update("name", "updated_user")
-	if result.Error != nil {
-		c.Fatalf("failed to update user: %v", result.Error)
-	}
-	c.Infof("updated user: %v\n", foundUser)
-
-	// delete user
-	result = db.Delete(&foundUser)
-	if result.Error != nil {
-		c.Fatalf("failed to delete user: %v", result.Error)
-	}
-	c.GetRedis().WithContext(c.WithTraceContext()).Set(c.WithTraceContext(), "user_dome", "xx", 3*time.Second)
 	c.HTTPError2(http.StatusOK, "X0111", "normal error", fmt.Errorf("system panic"))
 }
