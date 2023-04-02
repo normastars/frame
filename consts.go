@@ -7,9 +7,10 @@ import (
 
 // frame consts list
 const (
-	TraceIDKey string = "trace_id"
-	ModeJSON          = "json"
-	ModelText         = "text"
+	TraceIDKey  string = "trace_id"
+	ModeJSON           = "json"
+	ModelText          = "text"
+	TraceLogKey        = "req_msg"
 )
 
 var (
@@ -78,3 +79,12 @@ var defaultBusHTTPConfig = HTTPServerConfig{
 	Name: defaultBusName,
 	Port: defaultMetricPort2,
 }
+
+// TraceLogType trace lo type
+type TraceLogType string
+
+// trace type
+var (
+	TraceLogRouter     TraceLogType = "router"
+	TraceLogHTTPClient TraceLogType = "http_client"
+)

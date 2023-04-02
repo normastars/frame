@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
+	"github.com/imroc/req/v3"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
@@ -17,11 +18,17 @@ type Context struct {
 	dbClients    *DBMultiClient
 	redisClients *RedisMultiClient
 	*logrus.Entry
+	httpClient *req.Client
 }
 
 // GetTraceID return trace id from context
 func (c *Context) GetTraceID() string {
 	return c.Gtx.GetHeader(TraceIDKey)
+}
+
+// DoHTTP return http client
+func (c *Context) DoHTTP() *req.Client {
+	return c.httpClient
 }
 
 func (c *Context) getGormLogger() logger.Interface {
@@ -30,7 +37,7 @@ func (c *Context) getGormLogger() logger.Interface {
 
 // WithTraceContext return context
 func (c *Context) WithTraceContext() context.Context {
-	id := c.Gtx.GetHeader(TraceIDKey)
+	id := c.GetTraceID()
 	pc := context.Background()
 	return context.WithValue(pc, TraceIDKey, id)
 }
@@ -78,7 +85,7 @@ func (c *Context) GetRedis(name ...string) *redis.Client {
 
 // GetSetTraceHeader get trace_id from header, will set trace_id in header when header trace_id is empty
 func (c *Context) GetSetTraceHeader() string {
-	traceID := c.Gtx.GetHeader(TraceIDKey)
+	traceID := c.GetTraceID()
 	if len(traceID) > 0 {
 		return traceID
 	}

@@ -8,9 +8,19 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/imroc/req/v3"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
+
+var (
+	conf = LoadConfig()
+	cl   = NewLogger(conf)
+)
+
+func getConfig() *Config {
+	return conf
+}
 
 // App frame engine
 type App struct {
@@ -20,6 +30,14 @@ type App struct {
 	redisClients *RedisMultiClient
 	log          *logrus.Logger
 	*logrus.Entry
+}
+
+// New engin
+func New() *App {
+	// close gin log
+	gin.DefaultWriter = ioutil.Discard
+	e := newApp()
+	return e
 }
 
 // Run engin run
@@ -67,37 +85,29 @@ func (e *App) getMetricPort() string {
 	return e.config.getMetricPort()
 }
 
-// New engin
-func New() *App {
-	// close gin log
-	gin.DefaultWriter = ioutil.Discard
-	e := newApp()
-	return e
-}
-
 // newApp new engine
 func newApp() *App {
 	// default log
 	SetDefaultLog()
 
 	// step 1:  config
-	conf := LoadConfig()
+	ac := getConfig()
 
 	// step 2:  log
-	logger := NewLogger(conf)
+	logger := NewLogger(ac)
 
 	// step 3: mysql
-	newMySQLServers(conf)
+	newMySQLServers(ac)
 	mysqlConns := GetMySQLConn()
 
 	// step 4: redis
-	newRedisServers(conf)
+	newRedisServers(ac)
 	redisConns := GetRedisConn()
 
 	e := &App{
 		Engine:       defaultEngine(),
 		log:          logger,
-		config:       conf,
+		config:       ac,
 		dbClients:    mysqlConns,
 		redisClients: redisConns,
 	}
@@ -117,15 +127,35 @@ func defaultEngine() *gin.Engine {
 }
 
 func (e *App) createContext(c *gin.Context) *Context {
-	traceID := c.GetHeader(TraceIDKey)
-	l := e.log.WithField(TraceIDKey, traceID)
+	// set http client
 	return &Context{
 		Gtx:          c,
 		config:       e.config,
 		redisClients: e.redisClients,
 		dbClients:    e.dbClients,
-		Entry:        l,
+		Entry:        e.getLogEntry(c),
+		httpClient:   e.getHTTPClient(c),
 	}
+}
+
+func (e *App) getTraceID(c *gin.Context) string {
+	return c.GetHeader(TraceIDKey)
+}
+
+func (e *App) getLogEntry(c *gin.Context) *logrus.Entry {
+	return e.log.WithField(TraceIDKey, e.getTraceID(c))
+}
+
+func (e *App) getHTTPClient(c *gin.Context) *req.Client {
+	rc := req.C()
+	rc = rc.SetCommonHeader(TraceIDKey, e.getTraceID(c))
+	if !e.config.HTTPClient.DisableReqLog {
+		rc = rc.OnAfterResponse(ReqLogMiddleware)
+	}
+	if e.config.HTTPClient.EnableMetric {
+		rc = rc.OnAfterResponse(ReqMetricMiddleware)
+	}
+	return rc
 }
 
 // GET get method

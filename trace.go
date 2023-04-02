@@ -2,9 +2,9 @@ package frame
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"path"
 	"runtime"
 	"strings"
@@ -135,7 +135,8 @@ func LoggerFunc() HandlerFunc {
 				return
 			}
 			reqLog := logBody{
-				RequestID:  c.Gtx.Request.Header.Get(TraceIDKey),
+				TraceType:  TraceLogRouter,
+				TraceID:    c.Gtx.Request.Header.Get(TraceIDKey),
 				Code:       busCode,
 				StatusCode: c.Gtx.Writer.Status(),
 				Duration:   duration,
@@ -143,16 +144,17 @@ func LoggerFunc() HandlerFunc {
 				Path:       c.Gtx.Request.URL.Path,
 				Extra: reqLogExtra{
 					Req: reqLogBody{
-						// Header: requestHeader,
-						Body: requestBody,
+						Header:      c.Gtx.Request.Header,
+						QueryParams: c.Gtx.Request.URL.Query(),
+						PathParams:  c.Gtx.Params,
+						Body:        requestBody,
 					},
 					Resp: respLogBody{
 						Body: w.body.String(),
 					},
 				},
 			}
-			byts, _ := json.Marshal(reqLog)
-			c.Infoln(string(byts))
+			c.WithField(TraceLogKey, reqLog).Info("")
 		}()
 	}
 }
@@ -180,13 +182,15 @@ func (w responseWriter) Write(b []byte) (int, error) {
 }
 
 type logBody struct {
-	RequestID  string      `json:"request_id,omitempty"`
-	Code       string      `json:"code,omitempty"`
-	StatusCode int         `json:"statusCode,omitempty"`
-	Duration   int64       `json:"duration,omitempty"` // ms
-	Msg        string      `json:"msg,omitempty"`
-	Path       string      `json:"path,omitempty"`
-	Extra      reqLogExtra `json:"extra,omitempty"`
+	TraceType  TraceLogType `json:"trace_type,omitempty"`
+	TraceID    string       `json:"trace_id,omitempty"`
+	Code       string       `json:"code,omitempty"`
+	StatusCode int          `json:"status_code,omitempty"`
+	Duration   int64        `json:"duration,omitempty"` // ms
+	Msg        string       `json:"msg,omitempty"`
+	Host       string       `json:"host,omitempty"`
+	Path       string       `json:"path,omitempty"`
+	Extra      reqLogExtra  `json:"extra,omitempty"`
 }
 
 type reqLogExtra struct {
@@ -195,12 +199,12 @@ type reqLogExtra struct {
 }
 
 type reqLogBody struct {
-	Header interface{} `json:"header,omitempty"`
-	// Param  map[string]interface{} `json:"param,omitempty"`
-	Body string `json:"body,omitempty"`
+	Header      http.Header         `json:"header,omitempty"`
+	PathParams  interface{}         `json:"path_params,omitempty"`
+	QueryParams map[string][]string `json:"query_params,omitempty"`
+	Body        string              `json:"body,omitempty"`
 }
 
 type respLogBody struct {
-	Header interface{} `json:"header,omitempty"`
-	Body   string      `json:"body,omitempty"`
+	Body string `json:"body,omitempty"`
 }

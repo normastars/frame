@@ -15,15 +15,13 @@ func (e *App) Use(middleware ...HandlerFunc) {
 }
 
 func (e *App) convert2FrameContext(c *gin.Context) *Context {
-	// set trace_id
-	traceID := c.GetHeader(TraceIDKey)
-	l := e.log.WithField(TraceIDKey, traceID)
 	return &Context{
 		Gtx:          c,
 		config:       e.config,
 		dbClients:    e.dbClients,
 		redisClients: e.redisClients,
-		Entry:        l,
+		Entry:        e.getLogEntry(c),
+		httpClient:   e.getHTTPClient(c),
 	}
 }
 

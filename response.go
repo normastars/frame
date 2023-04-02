@@ -8,11 +8,10 @@ import (
 
 // Response http response data
 type Response struct {
-	Code      string      `json:"code,omitempty"`
-	RequestID string      `json:"request_id,omitempty"`
-	Data      interface{} `json:"data,omitempty"`
-	Message   string      `json:"message,omitempty"`
-	Time      time.Time   `json:"time,omitempty"`
+	Code    string      `json:"code,omitempty"`
+	Data    interface{} `json:"data,omitempty"`
+	Message string      `json:"message,omitempty"`
+	Time    time.Time   `json:"time,omitempty"`
 }
 
 // PageResults http response list data
@@ -62,11 +61,10 @@ func (ctx *Context) Error(errMsg ErrorMsg) {
 // default json
 func (ctx *Context) HTTPError(httpCode int, errMsg ErrorMsg) {
 	resp := &Response{
-		RequestID: ctx.GetTraceID(),
-		Code:      errMsg.GetCode(),
-		Message:   errMsg.GetReply(),
-		Data:      nil,
-		Time:      time.Now(),
+		Code:    errMsg.GetCode(),
+		Message: errMsg.GetReply(),
+		Data:    nil,
+		Time:    time.Now(),
 	}
 	ctx.printRealMsgLog(errMsg.GetReal())
 	ctx.Gtx.JSON(httpCode, resp)
@@ -75,11 +73,10 @@ func (ctx *Context) HTTPError(httpCode int, errMsg ErrorMsg) {
 // HTTPError2 http error response
 func (ctx *Context) HTTPError2(httpCode int, bussCode, userReply string, realMsg error) {
 	resp := &Response{
-		RequestID: ctx.GetTraceID(),
-		Code:      bussCode,
-		Message:   userReply,
-		Data:      nil,
-		Time:      time.Now(),
+		Code:    bussCode,
+		Message: userReply,
+		Data:    nil,
+		Time:    time.Now(),
 	}
 	ctx.printRealMsgLog(realMsg.Error())
 	ctx.Gtx.JSON(httpCode, resp)
@@ -98,11 +95,10 @@ func (ctx *Context) printRealMsgLog(realMsg string) {
 func (ctx *Context) HTTPListSuccess(pageData *PageResults) {
 	emptyPage(pageData)
 	resp := &Response{
-		RequestID: ctx.GetTraceID(),
-		Code:      successCode,
-		Message:   successMsg,
-		Data:      pageData,
-		Time:      time.Now(),
+		Code:    successCode,
+		Message: successMsg,
+		Data:    pageData,
+		Time:    time.Now(),
 	}
 	ctx.Gtx.JSON(http.StatusOK, resp)
 }
@@ -146,11 +142,10 @@ func (m *realMsg) String() string {
 // default json
 func (ctx *Context) HTTPListError2(httpCode int, errMsg ErrorMsg) {
 	resp := &Response{
-		RequestID: ctx.GetTraceID(),
-		Code:      errMsg.GetCode(),
-		Message:   errMsg.GetReply(),
-		Data:      defaultEmptyPage,
-		Time:      time.Now(),
+		Code:    errMsg.GetCode(),
+		Message: errMsg.GetReply(),
+		Data:    defaultEmptyPage,
+		Time:    time.Now(),
 	}
 	ctx.printRealMsgLog(errMsg.GetReal())
 	ctx.Gtx.JSON(httpCode, resp)

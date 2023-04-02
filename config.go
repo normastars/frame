@@ -52,15 +52,22 @@ func LoadConfig() *Config {
 
 // Config project config
 type Config struct {
-	Project      string      `json:"project"`
-	LogLevel     string      `json:"log_level" yaml:"log_level"  mapstructure:"log_level"`
-	LogMode      string      `json:"log_mode" yaml:"log_mode"  mapstructure:"log_mode"`
-	PrintConf    bool        `json:"print_conf" yaml:"print_conf"  mapstructure:"print_conf"`
-	EnableMetric bool        `json:"enable_metric" yaml:"enable_metric" mapstructure:"enable_metric"`
-	Env          string      `json:"env"`
-	HTTPServer   HTTPServer  `json:"http_server" yaml:"http_server" mapstructure:"http_server"`
-	Mysql        MySQLConfig `json:"mysql"`
-	Redis        RedisConfig `json:"redis"`
+	Project      string       `json:"project"`
+	LogLevel     string       `json:"log_level" yaml:"log_level"  mapstructure:"log_level"`
+	LogMode      string       `json:"log_mode" yaml:"log_mode"  mapstructure:"log_mode"`
+	PrintConf    bool         `json:"print_conf" yaml:"print_conf"  mapstructure:"print_conf"`
+	EnableMetric bool         `json:"enable_metric" yaml:"enable_metric" mapstructure:"enable_metric"`
+	Env          string       `json:"env"`
+	HTTPServer   HTTPServer   `json:"http_server" yaml:"http_server" mapstructure:"http_server"`
+	HTTPClient   DoHTTPClient `json:"http_client" yaml:"http_client" mapstructure:"http_client"`
+	Mysql        MySQLConfig  `json:"mysql"`
+	Redis        RedisConfig  `json:"redis"`
+}
+
+// DoHTTPClient http client config
+type DoHTTPClient struct {
+	DisableReqLog bool `json:"disable_req_log" yaml:"disable_req_log" mapstructure:"disable_req_log"` // default enable
+	EnableMetric  bool `json:"enable_metric" yaml:"enable_metric" mapstructure:"enable_metric"`
 }
 
 // HTTPServer http config
