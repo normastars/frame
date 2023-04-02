@@ -23,26 +23,14 @@ noma frame.
 
 ### 启动示例
 ```
-import (
-	"fmt"
-	"net/http"
-
-	"github.com/nomainc/frame"
-	"github.com/nomainc/frame/version"
-)
-
 type User struct {
 	ID   int    `json:"id,omitempty"`
 	Name string `json:"name,omitempty"`
 }
 
 func main() {
-	fmt.Printf("commit: %20s\n", version.GitCommit)
-	fmt.Printf("built on %20s\n", version.BuildGoVersion)
-	fmt.Printf("built on %20s\n", version.BuildSystem)
 	app := frame.New()
 	app.GET("/hello", HelloWorld)
-
 	app.Run()
 
 }
@@ -57,9 +45,10 @@ func HelloWorld(c *frame.Context) {
 		c.Fatalf("failed to create user: %v", result.Error)
 	}
 	c.Infof("created user: %v\n", user)
-	c.HTTPError2(http.StatusOK, "X0111", "normal error", fmt.Errorf("system panic"))
+	// send http
+	c.DoHTTP().R().Get("https://httpbin.org/uuid")
+	c.HTTPError2(http.StatusOK, "X0111", "normal error", errors.New("system panic"))
 }
-
 ```
 
 ### 常用指令

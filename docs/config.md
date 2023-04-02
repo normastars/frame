@@ -5,7 +5,7 @@
 {
 	"project": "nomainc",
 	"log_level": "info",
-	"log_mode": "text",
+	"log_mode": "json",
 	"print_conf": true,
 	"enable_metric": true,
 	"env": "dev",
@@ -20,6 +20,10 @@
 			"name": "metrics",
 			"port": ":9090"
 		}]
+	},
+	"http_client": {
+		"disable_req_log": false,
+		"enable_metric": true
 	},
 	"mysql": {
 		"enable": true,
@@ -64,6 +68,8 @@
 | http_server.enable_cors | bool | false | 是否运行cors跨域, 默认不允许 |
 | http_server.disable_req_log | bool | false | 是否禁用HTTP请求日志,默认启用 |
 | http_server.configs | array | nil | HTTP服务配置项列表, 如果 http_server.enable 为true,此处不能为空 |
+| http_client.disable_req_log | bool | false | 是否禁用请求HTTP请求日志,默认启用 |
+| http_client.enable_metric | bool | false | 是否启用请求HTTP请求指标,默认禁用 |
 | mysql.enable | bool | false | 是否启用MySQL数据库,默认不启用 |
 | mysql.disable_req_log | bool | false | 是否禁用MySQL请求日志,默认打印 |
 | mysql.configs | array | nil | MySQL数据库配置项列表 |

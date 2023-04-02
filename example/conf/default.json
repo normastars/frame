@@ -1,7 +1,7 @@
 {
 	"project": "nomainc",
 	"log_level": "info",
-	"log_mode": "text",
+	"log_mode": "json",
 	"print_conf": true,
 	"enable_metric": true,
 	"env": "dev",
@@ -16,6 +16,10 @@
 			"name": "metrics",
 			"port": ":9090"
 		}]
+	},
+	"http_client": {
+		"disable_req_log": false,
+		"enable_metric": true
 	},
 	"mysql": {
 		"enable": true,
