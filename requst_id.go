@@ -15,6 +15,7 @@ func TraceFunc() HandlerFunc {
 			traceID = generalTraceID(c.config.Project)
 			c.Gtx.Request.Header.Set(TraceIDKey, traceID)
 		}
+		c.traceID = traceID
 		c.Gtx.Writer.Header().Set(TraceIDKey, traceID)
 		c.Gtx.Next()
 	}

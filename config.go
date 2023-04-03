@@ -360,6 +360,21 @@ func (c *Config) setDefaultBusServerConfig() {
 	c.HTTPServer.Configs = append(c.HTTPServer.Configs, defaultBusHTTPConfig)
 }
 
+func (c *Config) isEnableMySQLAutoMigrate(dbName string) bool {
+	if len(c.Mysql.Configs) < 0 {
+		return false
+	}
+	if !c.Mysql.Enable {
+		return false
+	}
+	for _, v := range c.Mysql.Configs {
+		if v.Name == dbName && v.EnableAutoMigrate {
+			return true
+		}
+	}
+	return false
+}
+
 // Validate validate config
 func (c *Config) validate() []error {
 	var ers []error

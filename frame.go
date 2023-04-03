@@ -111,6 +111,7 @@ func newApp() *App {
 		dbClients:    mysqlConns,
 		redisClients: redisConns,
 	}
+
 	// common trace id
 	e.NewLogEntry()
 	if e.config.HTTPServer.EnableCors {
@@ -118,6 +119,9 @@ func newApp() *App {
 	}
 	e.Use(TraceFunc())
 	e.Use(LoggerFunc())
+
+	// table auto migrate
+	e.autoMigrateMysql()
 	return e
 }
 
@@ -138,6 +142,26 @@ func (e *App) createContext(c *gin.Context) *Context {
 	}
 }
 
+// NewContextNoGin return context but no include gin context
+func NewContextNoGin() *Context {
+	c := getConfig()
+	traceID := generalTraceID(c.Project)
+	return &Context{
+		config:       c,
+		redisClients: GetRedisConn(),
+		dbClients:    GetMySQLConn(),
+		Entry:        NewLogger(c).WithField(TraceIDKey, traceID),
+		httpClient:   getHTTPClient(c, traceID),
+	}
+}
+
+func (e *App) autoMigrateMysql() {
+	// tablesInit(e.createContext(c *gin.Context))
+	c := NewContextNoGin()
+	tablesInit(c)
+
+}
+
 func (e *App) getTraceID(c *gin.Context) string {
 	return c.GetHeader(TraceIDKey)
 }
@@ -147,12 +171,23 @@ func (e *App) getLogEntry(c *gin.Context) *logrus.Entry {
 }
 
 func (e *App) getHTTPClient(c *gin.Context) *req.Client {
+	traceID := c.GetHeader(TraceIDKey)
+	return getHTTPClient(e.config, traceID)
+}
+
+func getHTTPClient(conf *Config, traceID ...string) *req.Client {
+	tid := ""
+	if len(traceID) <= 0 {
+		tid = generalTraceID(conf.Project)
+	} else {
+		tid = traceID[0]
+	}
 	rc := req.C()
-	rc = rc.SetCommonHeader(TraceIDKey, e.getTraceID(c))
-	if !e.config.HTTPClient.DisableReqLog {
+	rc = rc.SetCommonHeader(TraceIDKey, tid)
+	if !conf.HTTPClient.DisableReqLog {
 		rc = rc.OnAfterResponse(ReqLogMiddleware)
 	}
-	if e.config.HTTPClient.EnableMetric {
+	if conf.HTTPClient.EnableMetric {
 		rc = rc.OnAfterResponse(ReqMetricMiddleware)
 	}
 	return rc

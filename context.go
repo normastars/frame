@@ -19,10 +19,17 @@ type Context struct {
 	redisClients *RedisMultiClient
 	*logrus.Entry
 	httpClient *req.Client
+	traceID    string
 }
 
 // GetTraceID return trace id from context
 func (c *Context) GetTraceID() string {
+	if c.Gtx == nil {
+		if c.traceID != "" {
+			return c.traceID
+		}
+		return ""
+	}
 	return c.Gtx.GetHeader(TraceIDKey)
 }
 
@@ -91,6 +98,7 @@ func (c *Context) GetSetTraceHeader() string {
 	}
 	traceID = generalTraceID(c.config.Project)
 	c.Gtx.Header(TraceIDKey, traceID)
+	c.traceID = traceID
 	return traceID
 }
 
