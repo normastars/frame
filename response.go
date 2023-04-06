@@ -16,10 +16,10 @@ type Response struct {
 
 // PageResults http response list data
 type PageResults struct {
-	Total    int           `json:"total,omitempty"`
-	Page     int           `json:"page,omitempty"`
-	PageSize int           `json:"page_size,omitempty"`
-	Results  []interface{} `json:"results,omitempty"`
+	Total    int         `json:"total,omitempty"`
+	Page     int         `json:"page,omitempty"`
+	PageSize int         `json:"page_size,omitempty"`
+	Results  interface{} `json:"results,omitempty"`
 }
 
 // Success http response ok
