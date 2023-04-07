@@ -13,7 +13,7 @@ type Table interface {
 }
 
 // RegisterTable register database table to tablelist.
-func RegisterTable(database string, table Table, initfuncs ...tableInitFunc) {
+func RegisterTable(database string, table Table, initfuncs ...TableInitFunc) {
 	databaseTables.Add(database, table, initfuncs...)
 }
 
@@ -28,7 +28,7 @@ func newDatabaseTableList() *databaseTableList {
 	return &databaseTableList{m: make(map[string][]tableInitTask, 0)}
 }
 
-func (tl *databaseTableList) Add(database string, table Table, initfuncs ...tableInitFunc) {
+func (tl *databaseTableList) Add(database string, table Table, initfuncs ...TableInitFunc) {
 	tl.Mutex.Lock()
 	defer tl.Mutex.Unlock()
 	fmt.Printf("table %s registered to %s successfully", table.TableName(), database)
@@ -60,12 +60,12 @@ func (tl *databaseTableList) List() *databaseTableList {
 	return databaseTables
 }
 
-type tableInitFunc func(conn *gorm.DB) error
+type TableInitFunc func(conn *gorm.DB) error
 
 // TableInitTask define table init task.
 type tableInitTask struct {
 	Model     Table
-	InitFuncs []tableInitFunc
+	InitFuncs []TableInitFunc
 }
 
 // TablesInit check table status, create or update tables.
