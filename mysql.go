@@ -104,7 +104,7 @@ func createDatabase(user, password, host, database string) error {
 
 // createDatabaseSQL create database
 func createDatabaseSQL(database string) string {
-	return fmt.Sprintf("CREATE DATABASE %s CHARACTER SET utf8 COLLATE utf8_general_ci", database)
+	return fmt.Sprintf("CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;", database)
 }
 
 type gormLogger struct {
