@@ -12,6 +12,7 @@ type Response struct {
 	Data    interface{} `json:"data,omitempty"`
 	Message string      `json:"message,omitempty"`
 	Time    time.Time   `json:"time,omitempty"`
+	TraceID string      `json:"trace_id,omitempty"`
 }
 
 // PageResults http response list data
@@ -30,6 +31,7 @@ func (ctx *Context) Success(data interface{}) {
 		Message: successMsg,
 		Data:    data,
 		Time:    time.Now(),
+		TraceID: ctx.GetTraceID(),
 	}
 	ctx.Gtx.JSON(200, resp)
 }
@@ -52,6 +54,7 @@ func (ctx *Context) Error(errMsg ErrorMsg) {
 		Message: errMsg.GetReply(),
 		Data:    nil,
 		Time:    time.Now(),
+		TraceID: ctx.GetTraceID(),
 	}
 	ctx.printRealMsgLog(errMsg.GetReal())
 	ctx.Gtx.JSON(http.StatusOK, resp)
@@ -65,6 +68,7 @@ func (ctx *Context) HTTPError(httpCode int, errMsg ErrorMsg) {
 		Message: errMsg.GetReply(),
 		Data:    nil,
 		Time:    time.Now(),
+		TraceID: ctx.GetTraceID(),
 	}
 	ctx.printRealMsgLog(errMsg.GetReal())
 	ctx.Gtx.JSON(httpCode, resp)
@@ -77,6 +81,7 @@ func (ctx *Context) HTTPError2(httpCode int, bussCode, userReply string, realMsg
 		Message: userReply,
 		Data:    nil,
 		Time:    time.Now(),
+		TraceID: ctx.GetTraceID(),
 	}
 	ctx.printRealMsgLog(realMsg.Error())
 	ctx.Gtx.JSON(httpCode, resp)
@@ -99,6 +104,7 @@ func (ctx *Context) HTTPListSuccess(pageData *PageResults) {
 		Message: successMsg,
 		Data:    pageData,
 		Time:    time.Now(),
+		TraceID: ctx.GetTraceID(),
 	}
 	ctx.Gtx.JSON(http.StatusOK, resp)
 }
@@ -112,6 +118,7 @@ func (ctx *Context) HTTPListError(errMsg ErrorMsg) {
 		Message: errMsg.GetReply(),
 		Data:    defaultEmptyPage,
 		Time:    time.Now(),
+		TraceID: ctx.GetTraceID(),
 	}
 	ctx.printRealMsgLog(errMsg.GetReal())
 	ctx.Gtx.JSON(http.StatusOK, resp)
@@ -146,6 +153,7 @@ func (ctx *Context) HTTPListError2(httpCode int, errMsg ErrorMsg) {
 		Message: errMsg.GetReply(),
 		Data:    defaultEmptyPage,
 		Time:    time.Now(),
+		TraceID: ctx.GetTraceID(),
 	}
 	ctx.printRealMsgLog(errMsg.GetReal())
 	ctx.Gtx.JSON(httpCode, resp)

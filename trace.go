@@ -77,32 +77,39 @@ func log2Level(l string) logrus.Level {
 	return logrus.InfoLevel
 }
 
+// isFileUpload 判断是否是文件上传接口
+func isFileUpload(r *http.Request) bool {
+	contentType := r.Header.Get("Content-Type")
+	return contentType == "multipart/form-data"
+}
+
 // LoggerFunc log func
 func LoggerFunc() HandlerFunc {
 	return func(c *Context) {
-
 		// request start
 		startTime := time.Now()
-
 		//  request body
 		var requestBody string
-		if c.Gtx.Request.Body != nil {
-			bodyBytes, err := ioutil.ReadAll(c.Gtx.Request.Body)
-			if err != nil {
-				log.WithError(err).Error("Failed to read request body")
-			} else {
-				requestBody = string(bodyBytes)
+		if isFileUpload(c.Gtx.Request) {
+			requestBody = ""
+		} else {
+			if c.Gtx.Request.Body != nil {
+				bodyBytes, err := ioutil.ReadAll(c.Gtx.Request.Body)
+				if err != nil {
+					log.WithError(err).Error("Failed to read request body")
+				} else {
+					requestBody = string(bodyBytes)
+				}
+				// reset body
+				c.Gtx.Request.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 			}
-
-			// reset body
-			c.Gtx.Request.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
 		}
 
 		// request header
-		requestHeader := make(map[string]string)
-		for k, v := range c.Gtx.Request.Header {
-			requestHeader[k] = strings.Join(v, ",")
-		}
+		// requestHeader := make(map[string]string)
+		// for k, v := range c.Gtx.Request.Header {
+		// 	requestHeader[k] = strings.Join(v, ",")
+		// }
 
 		// response body
 		w := &responseWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Gtx.Writer}
@@ -144,7 +151,7 @@ func LoggerFunc() HandlerFunc {
 				Path:       c.Gtx.Request.URL.Path,
 				Extra: reqLogExtra{
 					Req: reqLogBody{
-						Header:      c.Gtx.Request.Header,
+						// Header:      c.Gtx.Request.Header,
 						QueryParams: c.Gtx.Request.URL.Query(),
 						PathParams:  c.Gtx.Params,
 						Body:        requestBody,
