@@ -4,7 +4,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-var r = prometheus.NewRegistry()
+// var r = prometheus.NewRegistry()
 
 func init() {
 	prometheus.MustRegister(prometheusRequestDuration)

@@ -14,12 +14,29 @@ import (
 )
 
 var (
-	conf = LoadConfig()
-	cl   = NewLogger(conf)
+	// conf = LoadConfig()
+	// cl   = NewLogger(conf)
+	defaultLogLevel = "info"
+	defaultLogMode  = "text"
+	firstLoadConf   = 0 // 第一次加载日志配置
 )
 
+func getLogConf() *Config {
+	return &Config{
+		LogLevel: defaultLogLevel,
+		LogMode:  defaultLogMode,
+	}
+}
+
 func getConfig() *Config {
-	return conf
+	cf := LoadConfig()
+	if firstLoadConf == 0 {
+		defaultLogLevel = cf.LogLevel
+		defaultLogMode = cf.LogMode
+		firstLoadConf = 1
+	}
+
+	return cf
 }
 
 // App frame engine

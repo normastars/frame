@@ -84,5 +84,5 @@ func newTraceLogFromHTTPClient(c *req.Client, resp *req.Response) *logBody {
 
 func client2logEntry(c *req.Client) *logrus.Entry {
 	traceID := c.Headers.Get(TraceIDKey)
-	return NewLogger(conf).WithField(TraceIDKey, traceID)
+	return NewLogger(getLogConf()).WithField(TraceIDKey, traceID)
 }
