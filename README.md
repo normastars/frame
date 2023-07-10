@@ -16,6 +16,21 @@
 
 noma frame.
 ---
+###  框架优点
+1. 开发风格类似于Gin, 但包含了常用的外部连接库, 更易用
+2. 日志默认加上trace_id，故障排除更方便
+3. 业务指标暴露(Promehtues metrics)
+   
+### 框架功能特性
+1. 请求支持trace_id 联系上下文,支持快速的日志定位
+2. 默认采集http 的业务错误码到 prometheus metrics
+3. 集成 Mysql 客户端
+4. 集成 Redis 客户端
+5. 集成了 Http Do Request
+6. 支持自动创建数据库, 表
+7. 
+
+
 ### 基于此框架项目启动说明
 1. 配置路径: 可以通过环境变量**CONFPATH** 指定, 如未指定默认: **/conf/default.json **, 配置内容可以在**./docs/config.md** 复制
 2. 基本框架支持 mysql 连接, redis 连接, log 格式化, prometheus 指标采集, 基本的链路追踪, 根据需要配置
