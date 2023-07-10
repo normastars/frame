@@ -26,7 +26,8 @@ func main() {
 
 // HelloWorld hell world handler
 func HelloWorld(c *frame.Context) {
-	db := c.GetDB("user")
+	db := c.GetDB()
+	fmt.Println("db", db.Config)
 	// create user
 	user := User{Name: "test_user"}
 	result := db.Create(&user)
@@ -35,4 +36,8 @@ func HelloWorld(c *frame.Context) {
 	}
 	c.Infof("created user: %v\n", user)
 	c.HTTPError2(http.StatusOK, "X0111", "normal error", fmt.Errorf("system panic"))
+}
+
+func Add(a, b int) int {
+	return a + b
 }
