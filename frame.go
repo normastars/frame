@@ -28,8 +28,8 @@ func getLogConf() *Config {
 	}
 }
 
-func getConfig() *Config {
-	cf := LoadConfig()
+func getConfig(configPath ...string) *Config {
+	cf := LoadConfig(configPath...)
 	if firstLoadConf == 0 {
 		defaultLogLevel = cf.LogLevel
 		defaultLogMode = cf.LogMode
@@ -50,10 +50,10 @@ type App struct {
 }
 
 // New engin
-func New() *App {
+func New(configPath ...string) *App {
 	// close gin log
 	gin.DefaultWriter = ioutil.Discard
-	e := newApp()
+	e := newApp(configPath...)
 	return e
 }
 
@@ -103,12 +103,12 @@ func (e *App) getMetricPort() string {
 }
 
 // newApp new engine
-func newApp() *App {
+func newApp(configPath ...string) *App {
 	// default log
 	SetDefaultLog()
 
 	// step 1:  config
-	ac := getConfig()
+	ac := getConfig(configPath...)
 
 	// step 2:  log
 	logger := NewLogger(ac)
@@ -138,7 +138,7 @@ func newApp() *App {
 	e.Use(LoggerFunc())
 
 	// table auto migrate
-	e.autoMigrateMysql()
+	e.autoMigrateMysql(configPath...)
 	return e
 }
 
@@ -160,8 +160,8 @@ func (e *App) createContext(c *gin.Context) *Context {
 }
 
 // NewContextNoGin return context but no include gin context
-func NewContextNoGin() *Context {
-	c := getConfig()
+func NewContextNoGin(configPath ...string) *Context {
+	c := getConfig(configPath...)
 	traceID := generalTraceID(c.Project)
 	return &Context{
 		config:       c,
@@ -172,9 +172,8 @@ func NewContextNoGin() *Context {
 	}
 }
 
-func (e *App) autoMigrateMysql() {
-	// tablesInit(e.createContext(c *gin.Context))
-	c := NewContextNoGin()
+func (e *App) autoMigrateMysql(configPath ...string) {
+	c := NewContextNoGin(configPath...)
 	tablesInit(c)
 
 }

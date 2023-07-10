@@ -13,8 +13,17 @@ import (
 )
 
 // LoadConfig read config
-func LoadConfig() *Config {
-	ty, path := getConfigFromEnv()
+func LoadConfig(configPath ...string) *Config {
+	var (
+		ty   string
+		path string
+	)
+	if len(configPath) > 0 && configPath[0] != "" {
+		path = configPath[0]
+		ty, path = getConfigFromPath(path)
+	} else {
+		ty, path = getConfigFromEnv()
+	}
 	viper.SetConfigFile(path)
 	err := viper.ReadInConfig()
 	if err != nil {
@@ -424,7 +433,17 @@ func getConfigFromEnv() (t, path string) {
 	}
 	if strings.HasSuffix(path, configTypeYal) || strings.HasSuffix(path, configTypeYaml) {
 		t = configTypeYaml
+	} else {
+		t = configTypeJSON
 	}
-	t = configTypeJSON
 	return
+}
+func getConfigFromPath(pa string) (t string, path string) {
+	path = pa
+	if strings.HasSuffix(path, configTypeYal) || strings.HasSuffix(path, configTypeYaml) {
+		t = configTypeYaml
+	} else {
+		t = configTypeJSON
+	}
+	return t, path
 }
