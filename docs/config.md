@@ -3,7 +3,7 @@
 
 ```
 {
-	"project": "nomainc",
+	"project": "nomastars",
 	"log_level": "info",
 	"log_mode": "json",
 	"print_conf": true,
@@ -58,7 +58,7 @@
 
 | 字段名 | 类型 | 默认值 | 说明 |
 |--------|------|--------|------|
-| project | string | nomainc | 项目名称,必填 |
+| project | string | nomastars | 项目名称,必填 |
 | log_level | string | info | 日志级别,支持:debug,info,warn,error|
 | log_mode | string | json | 日志模式,json/text,默认:json |
 | print_conf | bool | false | 是否控制台打印加载后的日志内容 |

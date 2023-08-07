@@ -1,4 +1,4 @@
-module github.com/nomainc/frame
+module github.com/nomastars/frame
 
 go 1.18
 
