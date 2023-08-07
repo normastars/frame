@@ -1,4 +1,4 @@
-PROJECT_NAME := "github.com/nomainc/frame/example"
+PROJECT_NAME := "github.com/nomastars/frame/example"
 PKG := "$(PROJECT_NAME)"
 PKG_LIST := $(shell go list ${PKG}/... | grep -v /vendor/)
 LDFLAGS := "-s -w -X '$(PROJECT_NAME)/version.GitCommit=`git log | grep commit | head -1 | cut -d" " -f2 | cut -c1-8`' -X '$(PROJECT_NAME)/version.BuildGoVersion=`go version | cut -d" " -f3`' -X '$(PROJECT_NAME)/version.BuildSystem=`go version | cut -d" " -f4`'"
@@ -14,7 +14,7 @@ build-min-docker:
 	make clean
 	make linux
 	# TODO: need fix <registername> and <imagename>
-	docker build -t nomainc/frame/example:v2 -f build/docker/Dockerfile .
+	docker build -t nomastars/frame/example:v2 -f build/docker/Dockerfile .
 clean: ## Remove previous build
 	rm -rf bin
 	rm -rf manifest.txt
