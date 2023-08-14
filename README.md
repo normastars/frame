@@ -3,10 +3,10 @@
   <img alt="GoReleaser Logo" src="https://avatars2.githubusercontent.com/u/24697112?v=3&s=200" height="140" />
   <h3 align="center">Frame</h3>
   <p align="center">
-    <a href="https://github.com/nomastars/frame/releases/latest"><img alt="Codecov" src="https://img.shields.io/github/v/release/imyuliz/template-go.svg?logo=github&style=flat-square"></a>
+    <a href="https://github.com/normastars/frame/releases/latest"><img alt="Codecov" src="https://img.shields.io/github/v/release/imyuliz/template-go.svg?logo=github&style=flat-square"></a>
     <a href="https://codecov.io/gh/imyuliz/template-go"><img alt="Codecov" src="https://img.shields.io/codecov/c/github/imyuliz/template-go?logo=codecov&style=flat-square"></a>
-    <a href="https://github.com/nomastars/frame/actions?query=workflow%3A%22Lint+Test+Build%22"><img alt="GitHub marketplace" src="https://github.com/nomastars/frame/workflows/Lint%20Test%20Build/badge.svg"></a>
-    <a href="https://github.com/nomastars/frame/actions?query=workflow%3ARelease"><img alt="GitHub release" src="https://github.com/nomastars/frame/workflows/Release/badge.svg"></a>
+    <a href="https://github.com/normastars/frame/actions?query=workflow%3A%22Lint+Test+Build%22"><img alt="GitHub marketplace" src="https://github.com/normastars/frame/workflows/Lint%20Test%20Build/badge.svg"></a>
+    <a href="https://github.com/normastars/frame/actions?query=workflow%3ARelease"><img alt="GitHub release" src="https://github.com/normastars/frame/workflows/Release/badge.svg"></a>
     
   
   </p>
@@ -96,9 +96,9 @@ build-min-docker
 
 使用此模板创建项目后:
 
-1. 执行`go mod init`  例如: `go mod init github.com/nomastars/frame`
+1. 执行`go mod init`  例如: `go mod init github.com/normastars/frame`
 
-2. 修改`Makefile`文件中的最顶端的变量`PROJECT_NAME`为go mod init指定的项目名字,例如: `PROJECT_NAME := "github.com/nomastars/frame"`
+2. 修改`Makefile`文件中的最顶端的变量`PROJECT_NAME`为go mod init指定的项目名字,例如: `PROJECT_NAME := "github.com/normastars/frame"`
 
 3. 如需支持 `特性5`, 需要在`对应仓库`->`Settings`->`Secrets` 创建秘钥`CODECOV_TOKEN`, 对应值请登录: https://www.codecov.io/ 使用GitHub 关联登录,然后导入对应仓库后自动生成值,然后回写至 github 仓库秘钥
 
