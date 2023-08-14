@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/nomastars/frame"
+	"github.com/normastars/frame"
 )
 
 func TestAdd(t *testing.T) {

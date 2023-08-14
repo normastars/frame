@@ -1,5 +1,5 @@
 {
-	"project": "nomastars",
+	"project": "normastars",
 	"log_level": "info",
 	"log_mode": "json",
 	"print_conf": true,

@@ -1,4 +1,4 @@
-project: nomastars
+project: normastars
 log_level: info
 log_mode: text
 enable_metric: true

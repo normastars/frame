@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/nomastars/frame"
-	"github.com/nomastars/frame/example/version"
+	"github.com/normastars/frame"
+	"github.com/normastars/frame/example/version"
 )
 
 type User struct {
