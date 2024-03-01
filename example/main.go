@@ -13,12 +13,26 @@ type User struct {
 	Name string `json:"name,omitempty"`
 }
 
+type Metadata struct {
+	Name string `json:"name,omitempty"`
+}
+
 func main() {
 	fmt.Printf("commit: %20s\n", version.GitCommit)
 	fmt.Printf("built on %20s\n", version.BuildGoVersion)
 	fmt.Printf("built on %20s\n", version.BuildSystem)
 	app := frame.New()
 	app.GET("/hello", HelloWorld)
+	cm, _ := frame.ReadAppConfigManager()
+	fmt.Println(cm.Get("metadata.name"))
+	// frame.ReadAppConfigManager()
+	// cm.Get("metadata")
+	metaInfo := &Metadata{}
+	err := cm.UnmarshalKey("metadata", metaInfo)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(metaInfo)
 
 	app.Run()
 

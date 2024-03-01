@@ -33,3 +33,5 @@ redis:
           poolsize: 0
           password: ""
           db: 0
+metadata:
+  name: nginx-deployment
