@@ -12,7 +12,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	log "github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 	"gorm.io/gorm/logger"
 )
@@ -96,7 +95,7 @@ func LoggerFunc() HandlerFunc {
 			if c.Gtx.Request.Body != nil {
 				bodyBytes, err := ioutil.ReadAll(c.Gtx.Request.Body)
 				if err != nil {
-					log.WithError(err).Error("Failed to read request body")
+					logrus.WithError(err).Error("Failed to read request body")
 				} else {
 					requestBody = string(bodyBytes)
 				}
@@ -151,7 +150,6 @@ func LoggerFunc() HandlerFunc {
 				Path:       c.Gtx.Request.URL.Path,
 				Extra: reqLogExtra{
 					Req: reqLogBody{
-						// Header:      c.Gtx.Request.Header,
 						QueryParams: c.Gtx.Request.URL.Query(),
 						PathParams:  c.Gtx.Params,
 						Body:        requestBody,
@@ -172,10 +170,7 @@ func jsonGet(data string, key string) string {
 
 func isJSONBody(w gin.ResponseWriter) bool {
 	t := w.Header().Get("Content-Type")
-	if strings.Contains(t, "application/json") {
-		return true
-	}
-	return false
+	return strings.Contains(t, "application/json")
 }
 
 type responseWriter struct {

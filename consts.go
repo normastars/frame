@@ -1,6 +1,8 @@
 package frame
 
 import (
+	"sync"
+
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm/logger"
 )
@@ -8,9 +10,9 @@ import (
 // frame consts list
 const (
 	TraceIDKey  string = "trace_id"
-	ModeJSON           = "json"
-	ModelText          = "text"
-	TraceLogKey        = "req_msg"
+	ModeJSON    string = "json"
+	ModelText   string = "text"
+	TraceLogKey string = "req_msg"
 )
 
 var (
@@ -29,9 +31,6 @@ var (
 	defaultMetricPath  = "/metrics"
 	defaultMetricPort  = ":9090"
 	defaultMetricPort2 = "9090"
-	defaultBusName     = "server"
-	defaultBusPort     = "8080"
-	defaultBusPort2    = ":8080"
 )
 
 var logm = map[string]logrus.Level{
@@ -62,23 +61,13 @@ var (
 
 // config type
 var (
-	configTypeYaml    = "yaml"
-	configTypeYal     = "yml"
-	configTypeJSON    = "json" // default json
-	configPath        = "CONFPATH"
-	configType        = "CONFTYPE" // default ./conf/default.json
+	configTypeYaml = "yaml"
+	configTypeYal  = "yml"
+	configTypeJSON = "json" // default json
+	configPath     = "CONFPATH"
+	// configType        = "CONFTYPE" // default ./conf/default.json
 	configDefaultPath = "./conf/default.json"
 )
-
-var defaultMetricHTTPConfig = HTTPServerConfig{
-	Name: defaultMetricName,
-	Port: defaultMetricPort2,
-}
-
-var defaultBusHTTPConfig = HTTPServerConfig{
-	Name: defaultBusName,
-	Port: defaultMetricPort2,
-}
 
 // TraceLogType trace lo type
 type TraceLogType string
@@ -87,4 +76,10 @@ type TraceLogType string
 var (
 	TraceLogRouter     TraceLogType = "router"
 	TraceLogHTTPClient TraceLogType = "http_client"
+)
+
+var (
+	// configFilePath app config file path
+	fileSyncOnce   sync.Once
+	configFilePath string
 )

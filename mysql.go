@@ -44,7 +44,6 @@ func newMySQLServers(conf *Config) {
 				}
 			}
 		}
-		return
 	})
 }
 
@@ -77,16 +76,17 @@ func open(logLevel, logMode string, item MySQLConfigItem) *gorm.DB {
 		// auto migrate database
 		err = createDatabase(item.User, item.Password, item.Host, item.Database)
 		if err != nil {
-			panic(err)
+			logrus.Fatalln(err)
 		}
 		// retry connection mysql
 		dbConn, err = gorm.Open(mysql.Open(dsn), &gorm.Config{})
 		if err != nil {
-			panic(err)
+			logrus.Fatalln(err)
 		}
 		return dbConn
 	}
-	panic(err)
+	logrus.Fatalln(err)
+	return nil
 }
 
 func createDatabase(user, password, host, database string) error {

@@ -2,10 +2,8 @@ package frame
 
 import (
 	"context"
-	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/imroc/req/v3"
@@ -14,11 +12,9 @@ import (
 )
 
 var (
-	// conf = LoadConfig()
-	// cl   = NewLogger(conf)
 	defaultLogLevel = "info"
 	defaultLogMode  = "text"
-	firstLoadConf   = 0 // 第一次加载日志配置
+	initLoadConf    = 0 // 第一次加载日志配置
 )
 
 func getLogConf() *Config {
@@ -30,10 +26,10 @@ func getLogConf() *Config {
 
 func getConfig(configPath ...string) *Config {
 	cf := LoadConfig(configPath...)
-	if firstLoadConf == 0 {
+	if initLoadConf == 0 {
 		defaultLogLevel = cf.LogLevel
 		defaultLogMode = cf.LogMode
-		firstLoadConf = 1
+		initLoadConf = 1
 	}
 
 	return cf
@@ -68,11 +64,10 @@ func (e *App) metricRun() {
 	if e.config.EnableMetric && e.config.HTTPServer.Enable {
 		// metrics
 		port := e.getMetricPort()
-		fmt.Printf("%s server listen %s\n", defaultMetricName, port)
+		logrus.Infof("%s server listen %s\n", defaultMetricName, port)
 		http.Handle(defaultMetricPath, promhttp.Handler())
 		if err := http.ListenAndServe(port, nil); err != nil {
-			fmt.Println(err.Error())
-			os.Exit(-1)
+			logrus.Fatalln(err.Error())
 		}
 	}
 }
@@ -80,10 +75,9 @@ func (e *App) serverRun() error {
 	if e.config.HTTPServer.Enable {
 		// server port
 		port := e.getServerPort()
-		fmt.Printf("server listen %s\n", port)
+		logrus.Infof("server listen %s\n", port)
 		if err := e.Engine.Run(port); err != nil {
-			fmt.Println(err.Error())
-			os.Exit(-1)
+			logrus.Fatalln(err.Error())
 		}
 	}
 	return nil

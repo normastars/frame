@@ -2,7 +2,6 @@ package frame
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"sync"
 
@@ -33,7 +32,6 @@ func newRedisServers(conf *Config) {
 				openRedis(v)
 			}
 		}
-		return
 	})
 }
 
@@ -41,7 +39,6 @@ func openRedis(item RedisConfigItem) {
 	if !item.Enable {
 		return
 	}
-	fmt.Println(item.Password)
 	client := redis.NewClient(&redis.Options{
 		Addr:     item.Host,
 		Password: item.Password,

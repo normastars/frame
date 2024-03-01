@@ -1,9 +1,9 @@
 package frame
 
 import (
-	"fmt"
 	"sync"
 
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -31,7 +31,7 @@ func newDatabaseTableList() *databaseTableList {
 func (tl *databaseTableList) Add(database string, table Table, initfuncs ...TableInitFunc) {
 	tl.Mutex.Lock()
 	defer tl.Mutex.Unlock()
-	fmt.Printf("table %s registered to %s successfully\n", table.TableName(), database)
+	logrus.Infof("table %s registered to %s successfully\n", table.TableName(), database)
 	v, ok := tl.m[database]
 	ti := tableInitTask{Model: table, InitFuncs: initfuncs}
 	if !ok {
