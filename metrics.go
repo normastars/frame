@@ -17,7 +17,7 @@ var (
 	prometheusRequestDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
 		Name:    "request_duration_seconds",
 		Help:    "HTTP request duration in seconds.",
-		Buckets: []float64{50, 100, 250, 500, 1000, 2500, 5000, 10000}, // ms
+		Buckets: []float64{50, 100, 250, 500, 1000, 2500, 5000, 10000, 20000}, // ms
 	}, []string{"url", "code", "method"})
 
 	prometheusRequestBusCounter = prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -38,7 +38,7 @@ var (
 		prometheus.HistogramOpts{
 			Name:    "send_http_requests_duration_seconds",
 			Help:    "Duration in seconds to send http requests",
-			Buckets: []float64{50, 100, 250, 500, 1000, 2500, 5000, 10000}, // ms
+			Buckets: []float64{50, 100, 250, 500, 1000, 2500, 5000, 10000, 20000}, // ms
 		},
 		[]string{"method", "host", "path", "code"},
 	)

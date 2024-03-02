@@ -96,7 +96,7 @@ func (c *Context) GetSetTraceHeader() string {
 	if len(traceID) > 0 {
 		return traceID
 	}
-	traceID = generalTraceID(c.config.Project)
+	traceID = generateTraceID(c.config.Project)
 	c.Gtx.Header(TraceIDKey, traceID)
 	c.traceID = traceID
 	return traceID

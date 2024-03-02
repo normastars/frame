@@ -12,7 +12,7 @@ func TraceFunc() HandlerFunc {
 	return func(c *Context) {
 		traceID := c.Gtx.Request.Header.Get(TraceIDKey)
 		if traceID == "" {
-			traceID = generalTraceID(c.config.Project)
+			traceID = generateTraceID(c.config.Project)
 			c.Gtx.Request.Header.Set(TraceIDKey, traceID)
 		}
 		c.traceID = traceID
@@ -21,7 +21,7 @@ func TraceFunc() HandlerFunc {
 	}
 }
 
-func generalTraceID(project ...string) string {
+func generateTraceID(project ...string) string {
 	prefix := ""
 	if len(project) > 0 && project[0] != "" {
 		prefix = base64.StdEncoding.EncodeToString([]byte(project[0]))

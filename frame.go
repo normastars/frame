@@ -85,7 +85,7 @@ func (e *App) serverRun() error {
 
 // NewLogEntry new log entry
 func (e *App) NewLogEntry() {
-	e.Entry = e.log.WithField(TraceIDKey, generalTraceID(e.config.Project))
+	e.Entry = e.log.WithField(TraceIDKey, generateTraceID(e.config.Project))
 }
 
 func (e *App) getServerPort() string {
@@ -156,7 +156,7 @@ func (e *App) createContext(c *gin.Context) *Context {
 // NewContextNoGin return context but no include gin context
 func NewContextNoGin(configPath ...string) *Context {
 	c := getConfig(configPath...)
-	traceID := generalTraceID(c.Project)
+	traceID := generateTraceID(c.Project)
 	return &Context{
 		config:       c,
 		redisClients: GetRedisConn(),
@@ -188,7 +188,7 @@ func (e *App) getHTTPClient(c *gin.Context) *req.Client {
 func getHTTPClient(conf *Config, traceID ...string) *req.Client {
 	tid := ""
 	if len(traceID) <= 0 {
-		tid = generalTraceID(conf.Project)
+		tid = generateTraceID(conf.Project)
 	} else {
 		tid = traceID[0]
 	}
