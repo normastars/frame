@@ -24,24 +24,25 @@ func getLogConf() *Config {
 	}
 }
 
-func getConfig(configPath ...string) *Config {
-	cf := LoadConfig(configPath...)
+func getConfig(configPath ...string) (*ConfigManager, *Config) {
+	cm, cf := LoadConfig(configPath...)
 	if initLoadConf == 0 {
 		defaultLogLevel = cf.LogLevel
 		defaultLogMode = cf.LogMode
 		initLoadConf = 1
 	}
 
-	return cf
+	return cm, cf
 }
 
 // App frame engine
 type App struct {
 	*gin.Engine
-	config       *Config
-	dbClients    *DBMultiClient
-	redisClients *RedisMultiClient
-	log          *logrus.Logger
+	config        *Config
+	configManager *ConfigManager
+	dbClients     *DBMultiClient
+	redisClients  *RedisMultiClient
+	log           *logrus.Logger
 	*logrus.Entry
 }
 
@@ -102,7 +103,7 @@ func newApp(configPath ...string) *App {
 	SetDefaultLog()
 
 	// step 1:  config
-	ac := getConfig(configPath...)
+	cm, ac := getConfig(configPath...)
 
 	// step 2:  log
 	logger := NewLogger(ac)
@@ -116,11 +117,12 @@ func newApp(configPath ...string) *App {
 	redisConns := GetRedisConn()
 
 	e := &App{
-		Engine:       defaultEngine(),
-		log:          logger,
-		config:       ac,
-		dbClients:    mysqlConns,
-		redisClients: redisConns,
+		Engine:        defaultEngine(),
+		log:           logger,
+		config:        ac,
+		configManager: cm,
+		dbClients:     mysqlConns,
+		redisClients:  redisConns,
 	}
 
 	// common trace id
@@ -144,25 +146,27 @@ func defaultEngine() *gin.Engine {
 func (e *App) createContext(c *gin.Context) *Context {
 	// set http client
 	return &Context{
-		Gtx:          c,
-		config:       e.config,
-		redisClients: e.redisClients,
-		dbClients:    e.dbClients,
-		Entry:        e.getLogEntry(c),
-		httpClient:   e.getHTTPClient(c),
+		Gtx:           c,
+		config:        e.config,
+		configManager: e.configManager,
+		redisClients:  e.redisClients,
+		dbClients:     e.dbClients,
+		Entry:         e.getLogEntry(c),
+		httpClient:    e.getHTTPClient(c),
 	}
 }
 
 // NewContextNoGin return context but no include gin context
 func NewContextNoGin(configPath ...string) *Context {
-	c := getConfig(configPath...)
+	cm, c := getConfig(configPath...)
 	traceID := generateTraceID(c.Project)
 	return &Context{
-		config:       c,
-		redisClients: GetRedisConn(),
-		dbClients:    GetMySQLConn(),
-		Entry:        NewLogger(c).WithField(TraceIDKey, traceID),
-		httpClient:   getHTTPClient(c, traceID),
+		config:        c,
+		configManager: cm,
+		redisClients:  GetRedisConn(),
+		dbClients:     GetMySQLConn(),
+		Entry:         NewLogger(c).WithField(TraceIDKey, traceID),
+		httpClient:    getHTTPClient(c, traceID),
 	}
 }
 

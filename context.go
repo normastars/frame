@@ -13,10 +13,11 @@ import (
 
 // Context frame context
 type Context struct {
-	Gtx          *gin.Context
-	config       *Config
-	dbClients    *DBMultiClient
-	redisClients *RedisMultiClient
+	Gtx           *gin.Context
+	config        *Config
+	configManager *ConfigManager
+	dbClients     *DBMultiClient
+	redisClients  *RedisMultiClient
 	*logrus.Entry
 	httpClient *req.Client
 	traceID    string
@@ -106,4 +107,12 @@ func (c *Context) GetSetTraceHeader() string {
 func (c *Context) GetLogger() *logrus.Entry {
 	traceID := c.GetSetTraceHeader()
 	return c.Entry.WithField(TraceIDKey, traceID)
+}
+
+func (c *Context) GetConfig() *Config {
+	return c.config
+}
+
+func (c *Context) GetConfigManager() *ConfigManager {
+	return c.configManager
 }

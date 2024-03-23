@@ -43,7 +43,7 @@ func (cm *ConfigManager) ReadConfigObject(obj interface{}) error {
 }
 
 // LoadConfig read config
-func LoadConfig(configPath ...string) *Config {
+func LoadConfig(configPath ...string) (*ConfigManager, *Config) {
 	var (
 		ty   string
 		path string
@@ -82,7 +82,7 @@ func LoadConfig(configPath ...string) *Config {
 		}
 		logrus.Infoln("loading config content: ", string(cbyts))
 	}
-	return c
+	return cm, c
 }
 
 // ReadAppConfigManager
