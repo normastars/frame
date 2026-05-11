@@ -5,15 +5,10 @@ import (
 	"strconv"
 
 	"github.com/imroc/req/v3"
-	"github.com/sirupsen/logrus"
 )
 
-// var client = req.C().
-// 	OnAfterResponse(ReqMetricMiddleware)
-
-// ReqMetricMiddleware http req client
+// ReqMetricMiddleware http req client metric middleware
 var ReqMetricMiddleware req.ResponseMiddleware = func(c *req.Client, resp *req.Response) error {
-	// TODO: bus code metrics
 	req := resp.Request
 	code := ""
 	if resp.Response != nil {
@@ -22,18 +17,18 @@ var ReqMetricMiddleware req.ResponseMiddleware = func(c *req.Client, resp *req.R
 	sendHTTPRequests.WithLabelValues(
 		req.Method, req.URL.Host, req.URL.Path, code,
 	).Inc()
-	duration := resp.TotalTime().Milliseconds()
+	duration := resp.TotalTime().Seconds()
 	sendHTTPRequestsDuration.WithLabelValues(
 		req.Method, req.URL.Host, req.URL.Path, code,
-	).Observe(float64(duration))
+	).Observe(duration)
 	return nil
 }
 
-// ReqLogMiddleware http req client
+// ReqLogMiddleware http req client log middleware
 var ReqLogMiddleware req.ResponseMiddleware = func(c *req.Client, resp *req.Response) error {
 	logBody := newTraceLogFromHTTPClient(c, resp)
-	l := client2logEntry(c)
-	l.WithField(TraceLogKey, logBody).Info("")
+	traceID := c.Headers.Get(TraceIDKey)
+	NewLogger(getLogConf()).WithField(TraceIDKey, traceID).WithField(TraceLogKey, logBody).Info("")
 	return nil
 }
 
@@ -57,7 +52,7 @@ func newTraceLogFromHTTPClient(c *req.Client, resp *req.Response) *logBody {
 		qp = cr.QueryParams
 	}
 	var body string
-	if cr.Method != http.MethodGet && len(cr.Body) <= 0 {
+	if cr.Method != http.MethodGet && len(cr.Body) > 0 {
 		body = string(cr.Body)
 	}
 	sbody, _ := resp.ToString()
@@ -80,9 +75,4 @@ func newTraceLogFromHTTPClient(c *req.Client, resp *req.Response) *logBody {
 			},
 		},
 	}
-}
-
-func client2logEntry(c *req.Client) *logrus.Entry {
-	traceID := c.Headers.Get(TraceIDKey)
-	return NewLogger(getLogConf()).WithField(TraceIDKey, traceID)
 }

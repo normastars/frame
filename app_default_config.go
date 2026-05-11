@@ -10,16 +10,16 @@ import (
 
 // Config project config
 type Config struct {
-	Project      string       `json:"project"`
-	LogLevel     string       `json:"log_level" yaml:"log_level"  mapstructure:"log_level"`
-	LogMode      string       `json:"log_mode" yaml:"log_mode"  mapstructure:"log_mode"`
-	PrintConf    bool         `json:"print_conf" yaml:"print_conf"  mapstructure:"print_conf"`
+	Project      string       `json:"project" yaml:"project" mapstructure:"project"`
+	LogLevel     string       `json:"log_level" yaml:"log_level" mapstructure:"log_level"`
+	LogMode      string       `json:"log_mode" yaml:"log_mode" mapstructure:"log_mode"`
+	PrintConf    bool         `json:"print_conf" yaml:"print_conf" mapstructure:"print_conf"`
 	EnableMetric bool         `json:"enable_metric" yaml:"enable_metric" mapstructure:"enable_metric"`
-	Env          string       `json:"env"`
+	Env          string       `json:"env" yaml:"env" mapstructure:"env"`
 	HTTPServer   HTTPServer   `json:"http_server" yaml:"http_server" mapstructure:"http_server"`
 	HTTPClient   DoHTTPClient `json:"http_client" yaml:"http_client" mapstructure:"http_client"`
-	Mysql        MySQLConfig  `json:"mysql"`
-	Redis        RedisConfig  `json:"redis"`
+	Mysql        MySQLConfig  `json:"mysql" yaml:"mysql" mapstructure:"mysql"`
+	Redis        RedisConfig  `json:"redis" yaml:"redis" mapstructure:"redis"`
 }
 
 // DoHTTPClient http client config
@@ -30,10 +30,11 @@ type DoHTTPClient struct {
 
 // HTTPServer http config
 type HTTPServer struct {
-	Enable        bool               `json:"enable"`
+	Enable        bool               `json:"enable" yaml:"enable" mapstructure:"enable"`
 	EnableCors    bool               `json:"enable_cors" yaml:"enable_cors" mapstructure:"enable_cors"`
+	CorsOrigins   []string           `json:"cors_origins" yaml:"cors_origins" mapstructure:"cors_origins"`
 	DisableReqLog bool               `json:"disable_req_log" yaml:"disable_req_log" mapstructure:"disable_req_log"` // default enable
-	Configs       []HTTPServerConfig `json:"configs"`
+	Configs       []HTTPServerConfig `json:"configs" yaml:"configs" mapstructure:"configs"`
 }
 
 // Validate check http server
@@ -64,8 +65,8 @@ func (hs HTTPServer) Validate() []error {
 
 // HTTPServerConfig http server config item
 type HTTPServerConfig struct {
-	Name string `json:"name"`
-	Port string `json:"port"`
+	Name string `json:"name" yaml:"name" mapstructure:"name"`
+	Port string `json:"port" yaml:"port" mapstructure:"port"`
 }
 
 // Validate validate http server configs
@@ -89,9 +90,9 @@ func (tsc HTTPServerConfig) Validate() []error {
 
 // MySQLConfig mysql config
 type MySQLConfig struct {
-	Enable        bool              `json:"enable"`
+	Enable        bool              `json:"enable" yaml:"enable" mapstructure:"enable"`
 	DisableReqLog bool              `json:"disable_req_log" yaml:"disable_req_log" mapstructure:"disable_req_log"` // default enable
-	Configs       []MySQLConfigItem `json:"configs"`
+	Configs       []MySQLConfigItem `json:"configs" yaml:"configs" mapstructure:"configs"`
 }
 
 // Validate validate mysql config
@@ -123,13 +124,13 @@ func isMetricPort(port string) bool {
 
 // MySQLConfigItem mysql config item
 type MySQLConfigItem struct {
-	Name              string `json:"name"`
-	Enable            bool   `json:"enable"`
+	Name              string `json:"name" yaml:"name" mapstructure:"name"`
+	Enable            bool   `json:"enable" yaml:"enable" mapstructure:"enable"`
 	EnableAutoMigrate bool   `json:"enable_auto_migrate" yaml:"enable_auto_migrate" mapstructure:"enable_auto_migrate"` // default disable
-	Host              string `json:"host"`
-	Database          string `json:"database"`
-	User              string `json:"user"`
-	Password          string `json:"password"`
+	Host              string `json:"host" yaml:"host" mapstructure:"host"`
+	Database          string `json:"database" yaml:"database" mapstructure:"database"`
+	User              string `json:"user" yaml:"user" mapstructure:"user"`
+	Password          string `json:"password" yaml:"password" mapstructure:"password"`
 	SlowThresholdSec  int    `json:"slow_threshold_sec" yaml:"slow_threshold_sec" mapstructure:"slow_threshold_sec"`
 }
 
@@ -162,9 +163,9 @@ func (mci MySQLConfigItem) Validate() []error {
 
 // RedisConfig redis config
 type RedisConfig struct {
-	Enable        bool              `json:"enable"`
+	Enable        bool              `json:"enable" yaml:"enable" mapstructure:"enable"`
 	DisableReqLog bool              `json:"disable_req_log" yaml:"disable_req_log" mapstructure:"disable_req_log"` // default enable
-	Configs       []RedisConfigItem `json:"configs"`
+	Configs       []RedisConfigItem `json:"configs" yaml:"configs" mapstructure:"configs"`
 }
 
 // Validate redis validate
@@ -187,12 +188,12 @@ func (rc RedisConfig) Validate() []error {
 
 // RedisConfigItem redis config item
 type RedisConfigItem struct {
-	Name     string `json:"name"`
-	Enable   bool   `json:"enable"`
-	Host     string `json:"host"`
-	PoolSize int    `json:"pool_size" mapstructure:"pool_size"`
-	Password string `json:"password"`
-	DB       int    `json:"db"`
+	Name     string `json:"name" yaml:"name" mapstructure:"name"`
+	Enable   bool   `json:"enable" yaml:"enable" mapstructure:"enable"`
+	Host     string `json:"host" yaml:"host" mapstructure:"host"`
+	PoolSize int    `json:"pool_size" yaml:"pool_size" mapstructure:"pool_size"`
+	Password string `json:"password" yaml:"password" mapstructure:"password"`
+	DB       int    `json:"db" yaml:"db" mapstructure:"db"`
 }
 
 // Validate redis config item validate
@@ -213,20 +214,20 @@ func (rci RedisConfigItem) Validate() []error {
 	return errs
 }
 
-// GetMetricServerConfig return http metric server
+// getMetricServerConfig return http metric server config
 func (hs HTTPServer) getMetricServerConfig() *HTTPServerConfig {
-	for _, v := range hs.Configs {
-		if v.Name == defaultMetricName || v.Name == defaultMetricsName {
-			return &v
+	for i := range hs.Configs {
+		if hs.Configs[i].Name == defaultMetricName || hs.Configs[i].Name == defaultMetricsName {
+			return &hs.Configs[i]
 		}
 	}
 	return nil
 }
 
 func (hs HTTPServer) getBusServerConfig() *HTTPServerConfig {
-	for _, v := range hs.Configs {
-		if !(v.Name == defaultMetricName || v.Name == defaultMetricsName) {
-			return &v
+	for i := range hs.Configs {
+		if hs.Configs[i].Name != defaultMetricName && hs.Configs[i].Name != defaultMetricsName {
+			return &hs.Configs[i]
 		}
 	}
 	return nil
@@ -281,12 +282,51 @@ func (c *Config) validate() []error {
 
 }
 
+// Masked returns a copy of Config with passwords masked for safe printing.
+func (c *Config) Masked() *Config {
+	if c == nil {
+		return nil
+	}
+	clone := *c
+	// Mask MySQL passwords
+	if clone.Mysql.Enable {
+		maskedItems := make([]MySQLConfigItem, len(clone.Mysql.Configs))
+		for i, v := range clone.Mysql.Configs {
+			if v.Password != "" {
+				v.Password = "***"
+			}
+			maskedItems[i] = v
+		}
+		clone.Mysql.Configs = maskedItems
+	}
+	// Mask Redis passwords
+	if clone.Redis.Enable {
+		maskedItems := make([]RedisConfigItem, len(clone.Redis.Configs))
+		for i, v := range clone.Redis.Configs {
+			if v.Password != "" {
+				v.Password = "***"
+			}
+			maskedItems[i] = v
+		}
+		clone.Redis.Configs = maskedItems
+	}
+	return &clone
+}
+
 func (c *Config) getMetricPort() string {
-	return c.HTTPServer.getMetricServerConfig().Port
+	cfg := c.HTTPServer.getMetricServerConfig()
+	if cfg == nil {
+		return defaultMetricPort
+	}
+	return cfg.Port
 }
 
 func (c *Config) getServerPort() string {
-	return c.HTTPServer.getBusServerConfig().Port
+	cfg := c.HTTPServer.getBusServerConfig()
+	if cfg == nil {
+		return ""
+	}
+	return cfg.Port
 }
 
 func getConfigFromEnv() (t, path string) {

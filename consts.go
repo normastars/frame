@@ -1,8 +1,6 @@
 package frame
 
 import (
-	"sync"
-
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm/logger"
 )
@@ -80,6 +78,5 @@ var (
 
 var (
 	// configFilePath app config file path
-	fileSyncOnce   sync.Once
 	configFilePath string
 )

@@ -3,54 +3,26 @@ package frame
 import (
 	"context"
 	"strings"
-	"sync"
 
 	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 )
-
-var redisOnce sync.Once
 
 // RedisMultiClient multi db conns
 type RedisMultiClient struct {
 	clients map[string]*redis.Client
 }
 
-var redisMultiConn = &RedisMultiClient{
-	clients: map[string]*redis.Client{},
-}
-
-// GetRedisConn return  redis client
+// GetRedisConn returns the redis client map (backward-compatible function)
 func GetRedisConn() *RedisMultiClient {
-	return redisMultiConn
-}
-
-func newRedisServers(conf *Config) {
-	redisOnce.Do(func() {
-		if len(conf.Redis.Configs) > 0 && conf.Redis.Enable {
-			for _, v := range conf.Redis.Configs {
-				openRedis(v)
-			}
-		}
-	})
-}
-
-func openRedis(item RedisConfigItem) {
-	if !item.Enable {
-		return
+	core := getActiveCore()
+	if core == nil {
+		return &RedisMultiClient{clients: make(map[string]*redis.Client)}
 	}
-	client := redis.NewClient(&redis.Options{
-		Addr:     item.Host,
-		Password: item.Password,
-		PoolSize: item.PoolSize,
-		DB:       item.DB,
-	})
-	if client != nil {
-		redisMultiConn.clients[item.Name] = client
-	}
+	return core.legacyRedisConns
 }
 
-// Define a custom logging hook
+// redisLogHook is a Redis log hook
 type redisLogHook struct {
 	Log     *logrus.Logger
 	Disable bool
@@ -60,7 +32,6 @@ func newRedisLogHook(config *Config) redis.Hook {
 	return &redisLogHook{Log: NewLogger(config), Disable: config.Redis.DisableReqLog}
 }
 
-// BeforeProcess logs the command before it is processed
 func (l redisLogHook) BeforeProcess(ctx context.Context, cmd redis.Cmder) (context.Context, error) {
 	if l.Disable {
 		return ctx, nil
@@ -71,12 +42,10 @@ func (l redisLogHook) BeforeProcess(ctx context.Context, cmd redis.Cmder) (conte
 	return ctx, nil
 }
 
-// AfterProcess does nothing in this example
 func (l redisLogHook) AfterProcess(ctx context.Context, cmd redis.Cmder) error {
 	return nil
 }
 
-// BeforeProcessPipeline logs the commands before they are processed in a pipeline
 func (l redisLogHook) BeforeProcessPipeline(ctx context.Context, cmds []redis.Cmder) (context.Context, error) {
 	if l.Disable {
 		return ctx, nil
@@ -94,7 +63,6 @@ func (l redisLogHook) BeforeProcessPipeline(ctx context.Context, cmds []redis.Cm
 	return ctx, nil
 }
 
-// AfterProcessPipeline does nothing in this example
 func (l redisLogHook) AfterProcessPipeline(ctx context.Context, cmds []redis.Cmder) error {
 	return nil
 }

@@ -14,12 +14,6 @@ type ConfigManager struct {
 	*viper.Viper
 }
 
-func setConfigFilePath(path string) {
-	fileSyncOnce.Do(func() {
-		configFilePath = path
-	})
-}
-
 // NewConfigManager new config manager
 func NewConfigManager(configPath string) (*ConfigManager, error) {
 	v := viper.New()
@@ -54,13 +48,13 @@ func LoadConfig(configPath ...string) (*ConfigManager, *Config) {
 	} else {
 		ty, path = getConfigFromEnv()
 	}
-	setConfigFilePath(path)
 
 	cm, err := NewConfigManager(path)
 	if err != nil {
 		logrus.Fatalf("failed to read the configuration file, please check whether the %s file, err %v ", path, err)
 	}
 	logrus.Infof("load configuration file path: %s\n", path)
+	configFilePath = path
 	c := &Config{}
 	if err := cm.ReadConfigObject(c); err != nil {
 		logrus.Fatalf("load configuration file failed, err %v\n", err)
@@ -74,11 +68,12 @@ func LoadConfig(configPath ...string) (*ConfigManager, *Config) {
 	}
 	// print loaded configuration content
 	if c.PrintConf {
+		masked := c.Masked()
 		var cbyts []byte
 		if ty == configTypeJSON {
-			cbyts, _ = json.Marshal(c)
+			cbyts, _ = json.Marshal(masked)
 		} else {
-			cbyts, _ = yaml.Marshal(c)
+			cbyts, _ = yaml.Marshal(masked)
 		}
 		logrus.Infoln("loading config content: ", string(cbyts))
 	}

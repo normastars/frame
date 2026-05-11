@@ -3,7 +3,7 @@ package frame
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"path"
 	"runtime"
@@ -76,7 +76,7 @@ func log2Level(l string) logrus.Level {
 	return logrus.InfoLevel
 }
 
-// isFileUpload 判断是否是文件上传接口
+// isFileUpload checks if the request is a file upload
 func isFileUpload(r *http.Request) bool {
 	contentType := r.Header.Get("Content-Type")
 	return contentType == "multipart/form-data"
@@ -93,14 +93,14 @@ func LoggerFunc() HandlerFunc {
 			requestBody = ""
 		} else {
 			if c.Gtx.Request.Body != nil {
-				bodyBytes, err := ioutil.ReadAll(c.Gtx.Request.Body)
+				bodyBytes, err := io.ReadAll(c.Gtx.Request.Body)
 				if err != nil {
 					logrus.WithError(err).Error("Failed to read request body")
 				} else {
 					requestBody = string(bodyBytes)
 				}
 				// reset body
-				c.Gtx.Request.Body = ioutil.NopCloser(bytes.NewBuffer(bodyBytes))
+				c.Gtx.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
 			}
 		}
 
@@ -134,7 +134,7 @@ func LoggerFunc() HandlerFunc {
 
 			if c.config.EnableMetric {
 				// metrics
-				prometheusRequestDuration.WithLabelValues(url, hcr, method).Observe(float64(duration))
+				prometheusRequestDuration.WithLabelValues(url, hcr, method).Observe(float64(duration) / 1000)
 				prometheusRequestBusCounter.WithLabelValues(url, busCode, method).Inc()
 			}
 			if c.config.HTTPServer.DisableReqLog {
@@ -178,7 +178,7 @@ type responseWriter struct {
 	body *bytes.Buffer
 }
 
-func (w responseWriter) Write(b []byte) (int, error) {
+func (w *responseWriter) Write(b []byte) (int, error) {
 	w.body.Write(b)
 	return w.ResponseWriter.Write(b)
 }

@@ -160,8 +160,7 @@ func (ctx *Context) HTTPListError2(httpCode int, errMsg ErrorMsg) {
 }
 
 func emptyPage(pageData *PageResults) {
-	if !(pageData != nil) {
-		pageData = &defaultEmptyPage
+	if pageData == nil {
 		return
 	}
 	if pageData.Results == nil {

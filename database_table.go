@@ -14,10 +14,13 @@ type Table interface {
 
 // RegisterTable register database table to tablelist.
 func RegisterTable(database string, table Table, initfuncs ...TableInitFunc) {
-	databaseTables.Add(database, table, initfuncs...)
+	core := getActiveCore()
+	if core == nil {
+		logrus.Errorf("RegisterTable: no active app, cannot register table %s", table.TableName())
+		return
+	}
+	core.tableRegistry.Add(database, table, initfuncs...)
 }
-
-var databaseTables = newDatabaseTableList()
 
 type databaseTableList struct {
 	sync.Mutex
@@ -54,15 +57,20 @@ func (tl *databaseTableList) Add(database string, table Table, initfuncs ...Tabl
 	tl.m[database] = v
 }
 
-func (tl *databaseTableList) List() *databaseTableList {
+func (tl *databaseTableList) GetTables() map[string][]tableInitTask {
 	tl.Mutex.Lock()
 	defer tl.Mutex.Unlock()
-	return databaseTables
+	result := make(map[string][]tableInitTask, len(tl.m))
+	for k, v := range tl.m {
+		tasks := make([]tableInitTask, len(v))
+		copy(tasks, v)
+		result[k] = tasks
+	}
+	return result
 }
 
 type TableInitFunc func(conn *gorm.DB) error
 
-// TableInitTask define table init task.
 type tableInitTask struct {
 	Model     Table
 	InitFuncs []TableInitFunc
@@ -70,29 +78,32 @@ type tableInitTask struct {
 
 // TablesInit check table status, create or update tables.
 func tablesInit(ctx *Context) {
-	tables := databaseTables.List()
-	if tables == nil || len(tables.m) <= 0 {
+	core := getActiveCore()
+	if core == nil {
+		return
+	}
+	tables := core.tableRegistry.GetTables()
+	if len(tables) == 0 {
 		return
 	}
 	total := 0
-	for dbName, tableTasks := range tables.m {
-		// config
+	for dbName, tableTasks := range tables {
 		if !ctx.config.isEnableMySQLAutoMigrate(dbName) {
 			continue
 		}
-		if len(tableTasks) <= 0 {
+		if len(tableTasks) == 0 {
 			continue
 		}
 		ctx.Infof("-------------AutoMigrate database: %s begin-------------", dbName)
 		conn := ctx.GetDB(dbName)
 		for _, v := range tableTasks {
-			total = total + 1
+			total++
 			if err := conn.AutoMigrate(v.Model); err != nil {
 				ctx.Infof("Database %s table %s auto migrate failed, %s", dbName, v.Model.TableName(), err.Error())
 			} else {
 				ctx.Infof("Database %s table %s auto migrate successfully", dbName, v.Model.TableName())
 			}
-			if len(v.InitFuncs) <= 0 {
+			if len(v.InitFuncs) == 0 {
 				continue
 			}
 			for _, f := range v.InitFuncs {
@@ -104,7 +115,6 @@ func tablesInit(ctx *Context) {
 			}
 		}
 		ctx.Infof("-------------AutoMigrate database: %s end-------------", dbName)
-
 	}
 	ctx.Infof("a total of %d tables have been checked", total)
 }

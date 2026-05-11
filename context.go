@@ -16,11 +16,12 @@ type Context struct {
 	Gtx           *gin.Context
 	config        *Config
 	configManager *ConfigManager
-	dbClients     *DBMultiClient
-	redisClients  *RedisMultiClient
 	*logrus.Entry
 	httpClient *req.Client
 	traceID    string
+	coreApp    *coreApp
+	gormLogger logger.Interface
+	redisHook  redis.Hook
 }
 
 // GetTraceID return trace id from context
@@ -39,11 +40,7 @@ func (c *Context) DoHTTP() *req.Client {
 	return c.httpClient
 }
 
-func (c *Context) getGormLogger() logger.Interface {
-	return newGormLogger(c.config).LogMode(log2gormLevel(c.config.LogLevel))
-}
-
-// WithTraceContext return context
+// WithTraceContext return context with trace_id
 func (c *Context) WithTraceContext() context.Context {
 	id := c.GetTraceID()
 	pc := context.Background()
@@ -52,43 +49,35 @@ func (c *Context) WithTraceContext() context.Context {
 
 // GetDB get db client
 func (c *Context) GetDB(name ...string) *gorm.DB {
-	// default mysql client
-	if len(c.dbClients.clients) == 1 && len(name) == 0 {
-		for _, v := range c.dbClients.clients {
-			v = v.WithContext(c.WithTraceContext())
-			v.Logger = c.getGormLogger()
-			return v
-		}
+	if c.coreApp == nil || c.coreApp.dbManager == nil {
+		return nil
 	}
-	// panic when db
-	if len(name) == 0 {
-		panic("db client can't find, db name is empty")
+
+	var db *gorm.DB
+	if c.coreApp.mockDB != nil {
+		db = c.coreApp.mockDB.DB
+	} else {
+		db = c.coreApp.dbManager.GetDB(name...)
 	}
-	db := c.dbClients.clients[name[0]]
-	if db != nil {
-		db = db.WithContext(c.WithTraceContext())
-		db.Logger = c.getGormLogger()
+
+	if db == nil {
+		return nil
 	}
+	db = db.WithContext(c.WithTraceContext())
+	db.Logger = c.gormLogger
 	return db
 }
 
 // GetRedis get redis client
 func (c *Context) GetRedis(name ...string) *redis.Client {
-	// default redis client
-	if len(c.redisClients.clients) == 1 && len(name) == 0 {
-		for _, v := range c.redisClients.clients {
-			v = v.WithContext(c.WithTraceContext())
-			v.AddHook(newRedisLogHook(c.config))
-			return v
-		}
+	if c.coreApp == nil {
+		return nil
 	}
-	if len(name) == 0 {
-		panic("redis client can't find, redis name is empty")
+
+	if c.coreApp.mockRedis != nil {
+		return c.coreApp.mockRedis
 	}
-	r := c.redisClients.clients[name[0]]
-	r = r.WithContext(c.WithTraceContext())
-	r.AddHook(newRedisLogHook(c.config))
-	return r
+	return c.coreApp.cacheManager.GetRedis(name...)
 }
 
 // GetSetTraceHeader get trace_id from header, will set trace_id in header when header trace_id is empty
@@ -109,10 +98,12 @@ func (c *Context) GetLogger() *logrus.Entry {
 	return c.Entry.WithField(TraceIDKey, traceID)
 }
 
+// GetConfig return app config
 func (c *Context) GetConfig() *Config {
 	return c.config
 }
 
+// GetConfigManager return config manager
 func (c *Context) GetConfigManager() *ConfigManager {
 	return c.configManager
 }

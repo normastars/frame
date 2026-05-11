@@ -2,11 +2,16 @@ package frame
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os/signal"
+	"sync"
+	"syscall"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/imroc/req/v3"
+	"github.com/normastars/frame/core"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
@@ -14,7 +19,6 @@ import (
 var (
 	defaultLogLevel = "info"
 	defaultLogMode  = "text"
-	initLoadConf    = 0 // 第一次加载日志配置
 )
 
 func getLogConf() *Config {
@@ -26,133 +30,164 @@ func getLogConf() *Config {
 
 func getConfig(configPath ...string) (*ConfigManager, *Config) {
 	cm, cf := LoadConfig(configPath...)
-	if initLoadConf == 0 {
+	if cf.LogLevel != "" {
 		defaultLogLevel = cf.LogLevel
-		defaultLogMode = cf.LogMode
-		initLoadConf = 1
 	}
-
+	if cf.LogMode != "" {
+		defaultLogMode = cf.LogMode
+	}
 	return cm, cf
+}
+
+// activeCore holds the currently active application core instance.
+// Set once during New() call, used only for backward-compatible functions (GetMySQLConn, GetRedisConn, RegisterTable).
+var (
+	activeCore   *coreApp
+	activeCoreMu sync.Mutex
+)
+
+func setActiveCore(c *coreApp) {
+	activeCoreMu.Lock()
+	defer activeCoreMu.Unlock()
+	activeCore = c
+}
+
+func getActiveCore() *coreApp {
+	activeCoreMu.Lock()
+	defer activeCoreMu.Unlock()
+	return activeCore
 }
 
 // App frame engine
 type App struct {
 	*gin.Engine
-	config        *Config
-	configManager *ConfigManager
-	dbClients     *DBMultiClient
-	redisClients  *RedisMultiClient
-	log           *logrus.Logger
-	*logrus.Entry
+	core  *coreApp
+	log   *logrus.Logger
+	Entry *logrus.Entry
 }
 
-// New engin
-func New(configPath ...string) *App {
-	// close gin log
-	gin.DefaultWriter = ioutil.Discard
-	e := newApp(configPath...)
-	return e
-}
+// New creates an App. Arguments can be config file paths or Options.
+//
+//	app := frame.New()                     // default config
+//	app := frame.New("./conf/dev.json")    // custom config path
+//	app := frame.New(frame.WithMockDB(db)) // mock injection for tests
+func New(configs ...interface{}) *App {
+	gin.DefaultWriter = io.Discard
 
-// Run engin run
-// ":8080"
-func (e *App) Run() error {
-	go e.metricRun()
-	return e.serverRun()
-}
+	var configPath []string
+	var opts []core.Option
 
-func (e *App) metricRun() {
-	if e.config.EnableMetric && e.config.HTTPServer.Enable {
-		// metrics
-		port := e.getMetricPort()
-		logrus.Infof("%s server listen %s\n", defaultMetricName, port)
-		http.Handle(defaultMetricPath, promhttp.Handler())
-		if err := http.ListenAndServe(port, nil); err != nil {
-			logrus.Fatalln(err.Error())
+	for _, arg := range configs {
+		switch v := arg.(type) {
+		case string:
+			configPath = append(configPath, v)
+		case core.Option:
+			opts = append(opts, v)
 		}
 	}
-}
-func (e *App) serverRun() error {
-	if e.config.HTTPServer.Enable {
-		// server port
-		port := e.getServerPort()
-		logrus.Infof("server listen %s\n", port)
-		if err := e.Engine.Run(port); err != nil {
-			logrus.Fatalln(err.Error())
-		}
-	}
-	return nil
-}
 
-// NewLogEntry new log entry
-func (e *App) NewLogEntry() {
-	e.Entry = e.log.WithField(TraceIDKey, generateTraceID(e.config.Project))
-}
-
-func (e *App) getServerPort() string {
-	return e.config.getServerPort()
-}
-
-func (e *App) getMetricPort() string {
-	return e.config.getMetricPort()
-}
-
-// newApp new engine
-func newApp(configPath ...string) *App {
-	// default log
 	SetDefaultLog()
-
-	// step 1:  config
 	cm, ac := getConfig(configPath...)
-
-	// step 2:  log
 	logger := NewLogger(ac)
 
-	// step 3: mysql
-	newMySQLServers(ac)
-	mysqlConns := GetMySQLConn()
+	// Explicitly register Prometheus metrics (replacing init() auto-registration)
+	registerMetrics()
 
-	// step 4: redis
-	newRedisServers(ac)
-	redisConns := GetRedisConn()
+	coreApp := newCoreApp(ac, cm, opts...)
+	setActiveCore(coreApp)
 
 	e := &App{
-		Engine:        defaultEngine(),
-		log:           logger,
-		config:        ac,
-		configManager: cm,
-		dbClients:     mysqlConns,
-		redisClients:  redisConns,
+		Engine: coreApp.engine,
+		core:   coreApp,
+		log:    logger,
 	}
-
-	// common trace id
 	e.NewLogEntry()
-	if e.config.HTTPServer.EnableCors {
-		e.Use(CORSFunc())
+
+	// Register global middlewares (via App.Use to ensure unified Context construction)
+	if coreApp.config.HTTPServer.EnableCors {
+		e.Use(CORSFunc(coreApp.config.HTTPServer.CorsOrigins...))
 	}
 	e.Use(TraceFunc())
 	e.Use(LoggerFunc())
 
-	// table auto migrate
-	e.autoMigrateMysql(configPath...)
+	// Auto-migrate tables
+	coreApp.autoMigrateTables()
+
 	return e
 }
 
-func defaultEngine() *gin.Engine {
-	r := gin.Default()
-	return r
+// Run starts the server with graceful shutdown support
+func (e *App) Run() error {
+	if !e.core.config.HTTPServer.Enable {
+		return nil
+	}
+
+	var metricServer *http.Server
+	if e.core.config.EnableMetric {
+		metricServer = e.startMetricServer()
+	}
+
+	srv := &http.Server{
+		Addr:    e.core.config.getServerPort(),
+		Handler: e.Engine,
+	}
+
+	go func() {
+		logrus.Infof("server listen %s\n", srv.Addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logrus.Fatalf("server error: %v", err)
+		}
+	}()
+
+	quit, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	<-quit.Done()
+
+	logrus.Info("shutting down server...")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		logrus.Errorf("server forced to shutdown: %v", err)
+	}
+	if metricServer != nil {
+		if err := metricServer.Shutdown(ctx); err != nil {
+			logrus.Errorf("metric server forced to shutdown: %v", err)
+		}
+	}
+	logrus.Info("server exited")
+	return nil
+}
+
+func (e *App) startMetricServer() *http.Server {
+	port := e.core.config.getMetricPort()
+	mux := http.NewServeMux()
+	mux.Handle(defaultMetricPath, promhttp.Handler())
+	srv := &http.Server{Addr: port, Handler: mux}
+	go func() {
+		logrus.Infof("%s server listen %s\n", defaultMetricName, port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logrus.Fatalf("metric server error: %v", err)
+		}
+	}()
+	return srv
+}
+
+// NewLogEntry new log entry
+func (e *App) NewLogEntry() {
+	e.Entry = e.log.WithField(TraceIDKey, generateTraceID(e.core.config.Project))
 }
 
 func (e *App) createContext(c *gin.Context) *Context {
-	// set http client
 	return &Context{
 		Gtx:           c,
-		config:        e.config,
-		configManager: e.configManager,
-		redisClients:  e.redisClients,
-		dbClients:     e.dbClients,
+		config:        e.core.config,
+		configManager: e.core.configManager,
+		coreApp:       e.core,
 		Entry:         e.getLogEntry(c),
 		httpClient:    e.getHTTPClient(c),
+		gormLogger:    e.core.gormLogger,
+		redisHook:     e.core.redisHook,
 	}
 }
 
@@ -160,20 +195,16 @@ func (e *App) createContext(c *gin.Context) *Context {
 func NewContextNoGin(configPath ...string) *Context {
 	cm, c := getConfig(configPath...)
 	traceID := generateTraceID(c.Project)
+	core := newCoreApp(c, cm)
 	return &Context{
 		config:        c,
 		configManager: cm,
-		redisClients:  GetRedisConn(),
-		dbClients:     GetMySQLConn(),
+		coreApp:       core,
 		Entry:         NewLogger(c).WithField(TraceIDKey, traceID),
 		httpClient:    getHTTPClient(c, traceID),
+		gormLogger:    core.gormLogger,
+		redisHook:     core.redisHook,
 	}
-}
-
-func (e *App) autoMigrateMysql(configPath ...string) {
-	c := NewContextNoGin(configPath...)
-	tablesInit(c)
-
 }
 
 func (e *App) getTraceID(c *gin.Context) string {
@@ -186,25 +217,30 @@ func (e *App) getLogEntry(c *gin.Context) *logrus.Entry {
 
 func (e *App) getHTTPClient(c *gin.Context) *req.Client {
 	traceID := c.GetHeader(TraceIDKey)
-	return getHTTPClient(e.config, traceID)
+	return e.core.baseHTTPClient.SetCommonHeader(TraceIDKey, traceID)
 }
 
+// getHTTPClient creates an HTTP client for non-Gin contexts
 func getHTTPClient(conf *Config, traceID ...string) *req.Client {
 	tid := ""
-	if len(traceID) <= 0 {
-		tid = generateTraceID(conf.Project)
-	} else {
+	if len(traceID) > 0 && traceID[0] != "" {
 		tid = traceID[0]
+	} else {
+		tid = generateTraceID(conf.Project)
 	}
 	rc := req.C()
-	rc = rc.SetCommonHeader(TraceIDKey, tid)
 	if !conf.HTTPClient.DisableReqLog {
 		rc = rc.OnAfterResponse(ReqLogMiddleware)
 	}
 	if conf.HTTPClient.EnableMetric {
 		rc = rc.OnAfterResponse(ReqMetricMiddleware)
 	}
+	rc = rc.SetCommonHeader(TraceIDKey, tid)
 	return rc
+}
+
+func defaultEngine() *gin.Engine {
+	return gin.Default()
 }
 
 // GET get method
@@ -257,5 +293,11 @@ func (e *App) HEAD(relativePath string, handler func(c *Context)) {
 
 func getTraceIDFromContext(ctx context.Context) string {
 	traceID := ctx.Value(TraceIDKey)
-	return traceID.(string)
+	if traceID == nil {
+		return ""
+	}
+	if id, ok := traceID.(string); ok {
+		return id
+	}
+	return ""
 }
