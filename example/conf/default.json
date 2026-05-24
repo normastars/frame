@@ -6,7 +6,7 @@
 	"enable_metric": true,
 	"env": "dev",
 	"http_server": {
-		"enable": false,
+		"enable": true,
 		"enable_cors": false,
 		"disable_req_log": false,
 		"configs": [{
@@ -24,30 +24,11 @@
 	"mysql": {
 		"enable": false,
 		"disable_req_log": true,
-		"configs": [{
-			"name": "user",
-			"enable": true,
-			"enable_auto_migrate": true,
-			"host": "127.0.0.1:3309",
-			"database": "user",
-			"user": "root",
-			"password": "root",
-			"slow_threshold_sec": 3
-		}]
+		"configs": []
 	},
 	"redis": {
 		"enable": false,
 		"disable_req_log": true,
-		"configs": [{
-			"name": "user",
-			"enable": true,
-			"host": "127.0.0.1:6380",
-			"pool_size": 0,
-			"password": "",
-			"db": 0
-		}]
-	},
-	"metadata":{
-		"name":"nginx-deployment"
+		"configs": []
 	}
 }

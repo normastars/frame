@@ -12,7 +12,8 @@ type Table interface {
 	TableName() string
 }
 
-// RegisterTable register database table to tablelist.
+// RegisterTable registers a table model for auto-migration.
+// Must be called before frame.New() to take effect.
 func RegisterTable(database string, table Table, initfuncs ...TableInitFunc) {
 	core := getActiveCore()
 	if core == nil {
@@ -22,53 +23,7 @@ func RegisterTable(database string, table Table, initfuncs ...TableInitFunc) {
 	core.tableRegistry.Add(database, table, initfuncs...)
 }
 
-type databaseTableList struct {
-	sync.Mutex
-	m map[string][]tableInitTask
-}
-
-func newDatabaseTableList() *databaseTableList {
-	return &databaseTableList{m: make(map[string][]tableInitTask, 0)}
-}
-
-func (tl *databaseTableList) Add(database string, table Table, initfuncs ...TableInitFunc) {
-	tl.Mutex.Lock()
-	defer tl.Mutex.Unlock()
-	logrus.Infof("table %s registered to %s successfully\n", table.TableName(), database)
-	v, ok := tl.m[database]
-	ti := tableInitTask{Model: table, InitFuncs: initfuncs}
-	if !ok {
-		tl.m[database] = []tableInitTask{ti}
-		return
-	}
-	find := false
-	if len(v) > 0 {
-		for _, ta := range v {
-			if ta.Model.TableName() == table.TableName() {
-				find = true
-				break
-			}
-		}
-	}
-	if find {
-		return
-	}
-	v = append(v, ti)
-	tl.m[database] = v
-}
-
-func (tl *databaseTableList) GetTables() map[string][]tableInitTask {
-	tl.Mutex.Lock()
-	defer tl.Mutex.Unlock()
-	result := make(map[string][]tableInitTask, len(tl.m))
-	for k, v := range tl.m {
-		tasks := make([]tableInitTask, len(v))
-		copy(tasks, v)
-		result[k] = tasks
-	}
-	return result
-}
-
+// TableInitFunc is a function called after a table is auto-migrated.
 type TableInitFunc func(conn *gorm.DB) error
 
 type tableInitTask struct {
@@ -76,45 +31,50 @@ type tableInitTask struct {
 	InitFuncs []TableInitFunc
 }
 
-// TablesInit check table status, create or update tables.
-func tablesInit(ctx *Context) {
-	core := getActiveCore()
-	if core == nil {
-		return
-	}
-	tables := core.tableRegistry.GetTables()
-	if len(tables) == 0 {
-		return
-	}
-	total := 0
-	for dbName, tableTasks := range tables {
-		if !ctx.config.isEnableMySQLAutoMigrate(dbName) {
-			continue
-		}
-		if len(tableTasks) == 0 {
-			continue
-		}
-		ctx.Infof("-------------AutoMigrate database: %s begin-------------", dbName)
-		conn := ctx.GetDB(dbName)
-		for _, v := range tableTasks {
-			total++
-			if err := conn.AutoMigrate(v.Model); err != nil {
-				ctx.Infof("Database %s table %s auto migrate failed, %s", dbName, v.Model.TableName(), err.Error())
-			} else {
-				ctx.Infof("Database %s table %s auto migrate successfully", dbName, v.Model.TableName())
-			}
-			if len(v.InitFuncs) == 0 {
-				continue
-			}
-			for _, f := range v.InitFuncs {
-				if err := f(conn); err != nil {
-					ctx.Infof("Database %s table %s init func was executed failed, %s", dbName, v.Model.TableName(), err.Error())
-				} else {
-					ctx.Infof("Database %s table %s init func was executed successfully", dbName, v.Model.TableName())
-				}
+// databaseTableList holds registered table definitions, keyed by database name.
+// Thread-safe: reads use RLock, writes use Lock.
+type databaseTableList struct {
+	mu sync.RWMutex
+	m  map[string][]tableInitTask
+}
+
+func newDatabaseTableList() *databaseTableList {
+	return &databaseTableList{m: make(map[string][]tableInitTask)}
+}
+
+// Add registers a table under the given database name.
+// Duplicate table names are silently ignored.
+func (tl *databaseTableList) Add(database string, table Table, initfuncs ...TableInitFunc) {
+	tl.mu.Lock()
+	defer tl.mu.Unlock()
+
+	entry := tableInitTask{Model: table, InitFuncs: initfuncs}
+	tableName := table.TableName()
+
+	if existing, ok := tl.m[database]; ok {
+		for _, t := range existing {
+			if t.Model.TableName() == tableName {
+				return // already registered, skip
 			}
 		}
-		ctx.Infof("-------------AutoMigrate database: %s end-------------", dbName)
+		tl.m[database] = append(existing, entry)
+	} else {
+		tl.m[database] = []tableInitTask{entry}
 	}
-	ctx.Infof("a total of %d tables have been checked", total)
+
+	logrus.Infof("table %s registered to %s successfully", tableName, database)
+}
+
+// GetTables returns a defensive copy of all registered tables.
+func (tl *databaseTableList) GetTables() map[string][]tableInitTask {
+	tl.mu.RLock()
+	defer tl.mu.RUnlock()
+
+	result := make(map[string][]tableInitTask, len(tl.m))
+	for dbName, tasks := range tl.m {
+		copied := make([]tableInitTask, len(tasks))
+		copy(copied, tasks)
+		result[dbName] = copied
+	}
+	return result
 }

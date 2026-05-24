@@ -2,6 +2,7 @@ package frame
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"os/signal"
@@ -16,26 +17,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	defaultLogLevel = "info"
-	defaultLogMode  = "text"
-)
-
-func getLogConf() *Config {
-	return &Config{
-		LogLevel: defaultLogLevel,
-		LogMode:  defaultLogMode,
-	}
-}
-
 func getConfig(configPath ...string) (*ConfigManager, *Config) {
 	cm, cf := LoadConfig(configPath...)
-	if cf.LogLevel != "" {
-		defaultLogLevel = cf.LogLevel
-	}
-	if cf.LogMode != "" {
-		defaultLogMode = cf.LogMode
-	}
 	return cm, cf
 }
 
@@ -90,7 +73,6 @@ func New(configs ...interface{}) *App {
 	cm, ac := getConfig(configPath...)
 	logger := NewLogger(ac)
 
-	// Explicitly register Prometheus metrics (replacing init() auto-registration)
 	registerMetrics()
 
 	coreApp := newCoreApp(ac, cm, opts...)
@@ -101,22 +83,36 @@ func New(configs ...interface{}) *App {
 		core:   coreApp,
 		log:    logger,
 	}
-	e.NewLogEntry()
+	e.Entry = e.log.WithField(TraceIDKey, generateTraceID(ac.Project))
 
-	// Register global middlewares (via App.Use to ensure unified Context construction)
 	if coreApp.config.HTTPServer.EnableCors {
 		e.Use(CORSFunc(coreApp.config.HTTPServer.CorsOrigins...))
 	}
 	e.Use(TraceFunc())
 	e.Use(LoggerFunc())
 
-	// Auto-migrate tables
+	// Set custom 404/405 handler that returns JSON so LoggerFunc logs it.
+	e.Engine.NoRoute(func(c *gin.Context) {
+		ctx := e.createContext(c)
+		ctx.HTTPError2(http.StatusNotFound, "ROUTE_NOT_FOUND", "route not found", fmt.Errorf("no route: %s %s", c.Request.Method, c.Request.URL.Path))
+	})
+	e.Engine.NoMethod(func(c *gin.Context) {
+		ctx := e.createContext(c)
+		ctx.HTTPError2(http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", fmt.Errorf("method not allowed: %s %s", c.Request.Method, c.Request.URL.Path))
+	})
+
 	coreApp.autoMigrateTables()
 
 	return e
 }
 
-// Run starts the server with graceful shutdown support
+// NewLogEntry reinitializes the Entry field with a new trace ID.
+// Deprecated: Entry is automatically initialized in New().
+func (e *App) NewLogEntry() {
+	e.Entry = e.log.WithField(TraceIDKey, generateTraceID(e.core.config.Project))
+}
+
+// Run starts the server with graceful shutdown support.
 func (e *App) Run() error {
 	if !e.core.config.HTTPServer.Enable {
 		return nil
@@ -144,6 +140,8 @@ func (e *App) Run() error {
 	<-quit.Done()
 
 	logrus.Info("shutting down server...")
+
+	// Use a shared context for shutdown; each Shutdown call is best-effort.
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -173,40 +171,7 @@ func (e *App) startMetricServer() *http.Server {
 	return srv
 }
 
-// NewLogEntry new log entry
-func (e *App) NewLogEntry() {
-	e.Entry = e.log.WithField(TraceIDKey, generateTraceID(e.core.config.Project))
-}
-
-func (e *App) createContext(c *gin.Context) *Context {
-	return &Context{
-		Gtx:           c,
-		config:        e.core.config,
-		configManager: e.core.configManager,
-		coreApp:       e.core,
-		Entry:         e.getLogEntry(c),
-		httpClient:    e.getHTTPClient(c),
-		gormLogger:    e.core.gormLogger,
-		redisHook:     e.core.redisHook,
-	}
-}
-
-// NewContextNoGin return context but no include gin context
-func NewContextNoGin(configPath ...string) *Context {
-	cm, c := getConfig(configPath...)
-	traceID := generateTraceID(c.Project)
-	core := newCoreApp(c, cm)
-	return &Context{
-		config:        c,
-		configManager: cm,
-		coreApp:       core,
-		Entry:         NewLogger(c).WithField(TraceIDKey, traceID),
-		httpClient:    getHTTPClient(c, traceID),
-		gormLogger:    core.gormLogger,
-		redisHook:     core.redisHook,
-	}
-}
-
+// getTraceID extracts the trace ID from the gin request header.
 func (e *App) getTraceID(c *gin.Context) string {
 	return c.GetHeader(TraceIDKey)
 }
@@ -216,11 +181,11 @@ func (e *App) getLogEntry(c *gin.Context) *logrus.Entry {
 }
 
 func (e *App) getHTTPClient(c *gin.Context) *req.Client {
-	traceID := c.GetHeader(TraceIDKey)
+	traceID := e.getTraceID(c)
 	return e.core.baseHTTPClient.SetCommonHeader(TraceIDKey, traceID)
 }
 
-// getHTTPClient creates an HTTP client for non-Gin contexts
+// getHTTPClient creates an HTTP client for non-Gin contexts.
 func getHTTPClient(conf *Config, traceID ...string) *req.Client {
 	tid := ""
 	if len(traceID) > 0 && traceID[0] != "" {
@@ -243,52 +208,72 @@ func defaultEngine() *gin.Engine {
 	return gin.Default()
 }
 
-// GET get method
+// registerRouteWithContext creates a gin handler that builds a frame Context
+// in a closure, avoiding per-route-type boilerplate.
+func (e *App) registerRouteWithContext(handler func(c *Context)) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		handler(e.createContext(c))
+	}
+}
+
+func (e *App) createContext(c *gin.Context) *Context {
+	traceID := e.getTraceID(c)
+	return &Context{
+		Gtx:           c,
+		config:        e.core.config,
+		configManager: e.core.configManager,
+		coreApp:       e.core,
+		Entry:         e.log.WithField(TraceIDKey, traceID),
+		httpClient:    e.core.baseHTTPClient.SetCommonHeader(TraceIDKey, traceID),
+		gormLogger:    e.core.gormLogger,
+		redisHook:     e.core.redisHook,
+	}
+}
+
+// NewContextNoGin returns a context without a gin context (for non-HTTP use cases).
+func NewContextNoGin(configPath ...string) *Context {
+	cm, c := getConfig(configPath...)
+	traceID := generateTraceID(c.Project)
+	core := newCoreApp(c, cm)
+	return &Context{
+		config:        c,
+		configManager: cm,
+		coreApp:       core,
+		Entry:         NewLogger(c).WithField(TraceIDKey, traceID),
+		httpClient:    getHTTPClient(c, traceID),
+		gormLogger:    core.gormLogger,
+		redisHook:     core.redisHook,
+	}
+}
+
+// GET registers a GET route.
 func (e *App) GET(relativePath string, handler func(c *Context)) {
-	e.Engine.GET(relativePath, func(c *gin.Context) {
-		ctx := e.createContext(c)
-		handler(ctx)
-	})
+	e.Engine.GET(relativePath, e.registerRouteWithContext(handler))
 }
 
-// POST post method
+// POST registers a POST route.
 func (e *App) POST(relativePath string, handler func(c *Context)) {
-	e.Engine.POST(relativePath, func(c *gin.Context) {
-		ctx := e.createContext(c)
-		handler(ctx)
-	})
+	e.Engine.POST(relativePath, e.registerRouteWithContext(handler))
 }
 
-// PUT http put method
+// PUT registers a PUT route.
 func (e *App) PUT(relativePath string, handler func(c *Context)) {
-	e.Engine.PUT(relativePath, func(c *gin.Context) {
-		ctx := e.createContext(c)
-		handler(ctx)
-	})
+	e.Engine.PUT(relativePath, e.registerRouteWithContext(handler))
 }
 
-// PATCH  http patch method
+// PATCH registers a PATCH route.
 func (e *App) PATCH(relativePath string, handler func(c *Context)) {
-	e.Engine.PATCH(relativePath, func(c *gin.Context) {
-		ctx := e.createContext(c)
-		handler(ctx)
-	})
+	e.Engine.PATCH(relativePath, e.registerRouteWithContext(handler))
 }
 
-// DELETE http delete method
+// DELETE registers a DELETE route.
 func (e *App) DELETE(relativePath string, handler func(c *Context)) {
-	e.Engine.DELETE(relativePath, func(c *gin.Context) {
-		ctx := e.createContext(c)
-		handler(ctx)
-	})
+	e.Engine.DELETE(relativePath, e.registerRouteWithContext(handler))
 }
 
-// HEAD http head method
+// HEAD registers a HEAD route.
 func (e *App) HEAD(relativePath string, handler func(c *Context)) {
-	e.Engine.HEAD(relativePath, func(c *gin.Context) {
-		ctx := e.createContext(c)
-		handler(ctx)
-	})
+	e.Engine.HEAD(relativePath, e.registerRouteWithContext(handler))
 }
 
 func getTraceIDFromContext(ctx context.Context) string {

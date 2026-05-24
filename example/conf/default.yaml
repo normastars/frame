@@ -1,6 +1,7 @@
 project: normastars
 log_level: info
 log_mode: text
+print_conf: true
 enable_metric: true
 env: dev
 http_server:
@@ -11,27 +12,25 @@ http_server:
           port: :8080
         - name: metrics
           port: :9090
-mysql:
-    enable: true
-    disable_req_log: true
-    configs:
-        - name: user
-          enable: true
-          enable_auto_migrate: true
-          host: 127.0.0.1:3309
-          database: user
-          user: root
-          password: root
-          slow_threshold_sec: 3
-redis:
-    enable: true
-    disable_req_log: true
-    configs:
-        - name: user
-          enable: true
-          host: 127.0.0.1:6380
-          poolsize: 0
-          password: ""
-          db: 0
-metadata:
-  name: nginx-deployment
+# mysql:
+#     enable: true
+#     disable_req_log: true
+#     configs:
+#         - name: user
+#           enable: true
+#           enable_auto_migrate: true
+#           host: 127.0.0.1:3309
+#           database: user
+#           user: root
+#           password: root
+#           slow_threshold_sec: 3
+# redis:
+#     enable: true
+#     disable_req_log: true
+#     configs:
+#         - name: user
+#           enable: true
+#           host: 127.0.0.1:6380
+#           poolsize: 0
+#           password: ""
+#           db: 0

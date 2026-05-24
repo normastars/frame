@@ -1,6 +1,10 @@
 package frame
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"sync"
+
+	"github.com/prometheus/client_golang/prometheus"
+)
 
 // Prometheus metrics
 var (
@@ -34,9 +38,14 @@ var (
 	)
 )
 
-// registerMetrics explicitly registers Prometheus metrics, replacing init() auto-registration
+var registerMetricsOnce sync.Once
+
+// registerMetrics explicitly registers Prometheus metrics, replacing init() auto-registration.
+// Safe to call multiple times; registration only happens once.
 func registerMetrics() {
-	prometheus.MustRegister(prometheusRequestDuration)
-	prometheus.MustRegister(prometheusRequestBusCounter)
-	prometheus.MustRegister(sendHTTPRequests, sendHTTPRequestsDuration)
+	registerMetricsOnce.Do(func() {
+		prometheus.MustRegister(prometheusRequestDuration)
+		prometheus.MustRegister(prometheusRequestBusCounter)
+		prometheus.MustRegister(sendHTTPRequests, sendHTTPRequestsDuration)
+	})
 }

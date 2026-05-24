@@ -2,15 +2,15 @@ PROJECT_NAME := "github.com/normastars/frame/example"
 PKG := "$(PROJECT_NAME)"
 PKG_LIST := $(shell go list ${PKG}/... | grep -v /vendor/)
 LDFLAGS := "-s -w -X '$(PROJECT_NAME)/version.GitCommit=`git log | grep commit | head -1 | cut -d" " -f2 | cut -c1-8`' -X '$(PROJECT_NAME)/version.BuildGoVersion=`go version | cut -d" " -f3`' -X '$(PROJECT_NAME)/version.BuildSystem=`go version | cut -d" " -f4`'"
+GOBUILD := CGO_ENABLED=0 go build
+GOTEST  := CGO_ENABLED=0 go test
 .PHONY: build
 build: ## Build the binary file
 	make clean
 	make manifest
 	mkdir -p bin
-	go build -ldflags=${LDFLAGS} -o bin/server
+	$(GOBUILD) -ldflags=${LDFLAGS} -o bin/server
 build-min-docker:
-	# go build -ldflags=${LDFLAGS} -o bin/server && upx --best bin/server -o _upx_server && mv -f _upx_server bin/server
-	# go build -ldflags=${LDFLAGS} -o bin/server
 	make clean
 	make linux
 	# TODO: need fix <registername> and <imagename>
@@ -28,15 +28,16 @@ linux: ## Build the linux version binary file
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags=${LDFLAGS} -o bin/server
 lint: ## Lint Golang files
 	@golint -set_exit_status ${PKG_LIST}
-
 manifest:
 	echo `git log | grep commit | head -1 | cut -d" " -f2` > manifest.txt
-run: ## run project
+run: ## Run compiled binary
 	./bin/server
+dev: ## Run directly via go run (CGO disabled, no compile needed)
+	CGO_ENABLED=0 go run main.go
 test: ## Run unittests
-	@go test -short ${PKG_LIST}
+	@$(GOTEST) -short ${PKG_LIST}
 test-coverage: ## Run tests with coverage
-	@go test -short -coverprofile cover.out -covermode=atomic ${PKG_LIST}
+	@$(GOTEST) -short -coverprofile cover.out -covermode=atomic ${PKG_LIST}
 	@cat cover.out >> coverage.txt
 help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-30s\033[0m %s\n", $$1, $$2}'

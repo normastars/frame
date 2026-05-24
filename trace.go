@@ -2,11 +2,11 @@ package frame
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"net/http"
 	"path"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 
@@ -24,21 +24,18 @@ var defaultJSONLogFormatter = &logrus.JSONFormatter{
 
 // SetDefaultLog config project logrus log
 func SetDefaultLog() {
-	// default log config
 	logrus.SetReportCaller(true)
-	// set file name
 	logrus.SetFormatter(defaultJSONLogFormatter)
 }
 
 // NewLogger new logger
 func NewLogger(conf ...*Config) *logrus.Logger {
-	var l string
-	var m string
+	var level, mode string
 	if len(conf) > 0 {
-		l = conf[0].LogLevel
-		m = conf[0].LogMode
+		level = conf[0].LogLevel
+		mode = conf[0].LogMode
 	}
-	return newLoggerLevel(l, m)
+	return newLoggerLevel(level, mode)
 }
 
 func newLoggerLevel(level, mode string) *logrus.Logger {
@@ -47,11 +44,10 @@ func newLoggerLevel(level, mode string) *logrus.Logger {
 	if mode == "" || mode == ModeJSON {
 		logger.SetFormatter(defaultJSONLogFormatter)
 	}
-	if len(level) <= 0 {
+	if level == "" {
 		logger.SetLevel(logrus.DebugLevel)
 		return logger
 	}
-	// set log level, default info level
 	logger.SetLevel(log2Level(level))
 	return logger
 }
@@ -62,7 +58,6 @@ func log2gormLevel(l string) logger.LogLevel {
 	if ok {
 		return le
 	}
-	// default silent level
 	return logger.Silent
 }
 
@@ -72,82 +67,99 @@ func log2Level(l string) logrus.Level {
 	if ok {
 		return le
 	}
-	// default info level
 	return logrus.InfoLevel
 }
 
-// isFileUpload checks if the request is a file upload
+// isFileUpload checks if the request is a file upload.
+// Uses HasPrefix to handle Content-Type with boundary (e.g. multipart/form-data; boundary=---).
 func isFileUpload(r *http.Request) bool {
 	contentType := r.Header.Get("Content-Type")
-	return contentType == "multipart/form-data"
+	return strings.HasPrefix(contentType, "multipart/form-data")
+}
+
+// readRequestBody reads the full request body and restores it for downstream use.
+// Returns empty string for file uploads to avoid buffering large payloads.
+func readRequestBody(r *http.Request) string {
+	if r.Body == nil || isFileUpload(r) {
+		return ""
+	}
+	bodyBytes, err := io.ReadAll(r.Body)
+	if err != nil {
+		logrus.Errorf("failed to read request body: %v", err)
+		return ""
+	}
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+	return string(bodyBytes)
 }
 
 // LoggerFunc log func
 func LoggerFunc() HandlerFunc {
 	return func(c *Context) {
-		// request start
 		startTime := time.Now()
-		//  request body
-		var requestBody string
-		if isFileUpload(c.Gtx.Request) {
-			requestBody = ""
-		} else {
-			if c.Gtx.Request.Body != nil {
-				bodyBytes, err := io.ReadAll(c.Gtx.Request.Body)
-				if err != nil {
-					logrus.WithError(err).Error("Failed to read request body")
-				} else {
-					requestBody = string(bodyBytes)
-				}
-				// reset body
-				c.Gtx.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
-			}
+
+		requestBody := readRequestBody(c.Gtx.Request)
+
+		// capture values before goroutine to avoid race on c.Gtx.Request
+		traceID := c.Gtx.Request.Header.Get(TraceIDKey)
+		method := c.Gtx.Request.Method
+		url := c.Gtx.Request.URL.Path
+
+		// intercept response body
+		w := &responseWriter{
+			body:           bytes.NewBufferString(""),
+			ResponseWriter: c.Gtx.Writer,
 		}
-
-		// request header
-		// requestHeader := make(map[string]string)
-		// for k, v := range c.Gtx.Request.Header {
-		// 	requestHeader[k] = strings.Join(v, ",")
-		// }
-
-		// response body
-		w := &responseWriter{body: bytes.NewBufferString(""), ResponseWriter: c.Gtx.Writer}
 		c.Gtx.Writer = w
 
-		// detail request
 		c.Gtx.Next()
 
-		// request end
 		endTime := time.Now()
-		duration := endTime.Sub(startTime).Milliseconds()
-		// log body
-		rb := w.body.String()
+		durationMs := endTime.Sub(startTime).Milliseconds()
+
 		if !isJSONBody(w) {
 			return
 		}
-		go func() {
-			httpCode := c.Gtx.Writer.Status()
-			hcr := fmt.Sprintf("%d", httpCode)
-			busCode := jsonGet(rb, codeKey)
-			method := c.Gtx.Request.Method
-			url := c.Gtx.Request.URL.Path
 
-			if c.config.EnableMetric {
-				// metrics
-				prometheusRequestDuration.WithLabelValues(url, hcr, method).Observe(float64(duration) / 1000)
+		// decide whether we need the goroutine at all
+		enableMetric := c.config.EnableMetric
+		disableLog := c.config.HTTPServer.DisableReqLog
+		if !enableMetric && disableLog {
+			return
+		}
+
+		responseBody := w.body.String()
+		httpCode := c.Gtx.Writer.Status()
+
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logrus.Errorf("LoggerFunc metrics/log panic: %v", r)
+				}
+			}()
+
+			statusStr := strconv.Itoa(httpCode)
+
+			if enableMetric {
+				busCode := gjson.Get(responseBody, codeKey).String()
+				prometheusRequestDuration.WithLabelValues(url, statusStr, method).Observe(float64(durationMs) / 1000)
 				prometheusRequestBusCounter.WithLabelValues(url, busCode, method).Inc()
 			}
-			if c.config.HTTPServer.DisableReqLog {
+
+			if disableLog {
 				return
 			}
+
+			busCode := gjson.Get(responseBody, codeKey).String()
+			msg := gjson.Get(responseBody, msgKey).String()
+
 			reqLog := logBody{
 				TraceType:  TraceLogRouter,
-				TraceID:    c.Gtx.Request.Header.Get(TraceIDKey),
+				TraceID:    traceID,
 				Code:       busCode,
-				StatusCode: c.Gtx.Writer.Status(),
-				Duration:   duration,
-				Msg:        jsonGet(rb, msgKey),
-				Path:       c.Gtx.Request.URL.Path,
+				StatusCode: httpCode,
+				Duration:   durationMs,
+				Msg:        msg,
+				Path:       url,
 				Extra: reqLogExtra{
 					Req: reqLogBody{
 						QueryParams: c.Gtx.Request.URL.Query(),
@@ -155,7 +167,7 @@ func LoggerFunc() HandlerFunc {
 						Body:        requestBody,
 					},
 					Resp: respLogBody{
-						Body: w.body.String(),
+						Body: responseBody,
 					},
 				},
 			}
@@ -173,6 +185,7 @@ func isJSONBody(w gin.ResponseWriter) bool {
 	return strings.Contains(t, "application/json")
 }
 
+// responseWriter intercepts the response body for logging.
 type responseWriter struct {
 	gin.ResponseWriter
 	body *bytes.Buffer

@@ -1,7 +1,6 @@
 package frame
 
 import (
-	"encoding/json"
 	"net/http"
 	"time"
 )
@@ -23,143 +22,76 @@ type PageResults struct {
 	Results  interface{} `json:"results,omitempty"`
 }
 
-// Success http response ok
-// default json
-func (ctx *Context) Success(data interface{}) {
-	resp := &Response{
-		Code:    successCode,
-		Message: successMsg,
+// ErrorMsg represents a business error with a user-facing message and internal detail.
+type ErrorMsg interface {
+	GetCode() string
+	GetReal() string
+	GetReply() string
+}
+
+// buildResponse constructs a Response with common fields filled.
+func (ctx *Context) buildResponse(code, msg string, data interface{}) *Response {
+	return &Response{
+		Code:    code,
+		Message: msg,
 		Data:    data,
 		Time:    time.Now(),
 		TraceID: ctx.GetTraceID(),
 	}
-	ctx.Gtx.JSON(200, resp)
 }
 
-// ErrorMsg frame err msg
-type ErrorMsg interface {
-	// error  code
-	GetCode() string
-	// real error message, only log
-	GetReal() string
-	// user reply
-	GetReply() string
+// logRealError logs the internal error detail with a structured field for diagnostics.
+func (ctx *Context) logRealError(realMsg string) {
+	if realMsg == "" {
+		return
+	}
+	ctx.WithField("real_reason", realMsg).Error("")
 }
 
-// Error http response error msg
-// default json
+// Success returns a 200 response with the given data.
+func (ctx *Context) Success(data interface{}) {
+	ctx.Gtx.JSON(http.StatusOK, ctx.buildResponse(successCode, successMsg, data))
+}
+
+// Error returns a 200 response with a business error (non-HTTP failure).
 func (ctx *Context) Error(errMsg ErrorMsg) {
-	resp := &Response{
-		Code:    errMsg.GetCode(),
-		Message: errMsg.GetReply(),
-		Data:    nil,
-		Time:    time.Now(),
-		TraceID: ctx.GetTraceID(),
-	}
-	ctx.printRealMsgLog(errMsg.GetReal())
-	ctx.Gtx.JSON(http.StatusOK, resp)
+	ctx.logRealError(errMsg.GetReal())
+	ctx.Gtx.JSON(http.StatusOK, ctx.buildResponse(errMsg.GetCode(), errMsg.GetReply(), nil))
 }
 
-// HTTPError http response error msg and setting http code
-// default json
+// HTTPError returns an HTTP error response with the given status code.
 func (ctx *Context) HTTPError(httpCode int, errMsg ErrorMsg) {
-	resp := &Response{
-		Code:    errMsg.GetCode(),
-		Message: errMsg.GetReply(),
-		Data:    nil,
-		Time:    time.Now(),
-		TraceID: ctx.GetTraceID(),
-	}
-	ctx.printRealMsgLog(errMsg.GetReal())
-	ctx.Gtx.JSON(httpCode, resp)
+	ctx.logRealError(errMsg.GetReal())
+	ctx.Gtx.JSON(httpCode, ctx.buildResponse(errMsg.GetCode(), errMsg.GetReply(), nil))
 }
 
-// HTTPError2 http error response
+// HTTPError2 returns an HTTP error response with inline error fields (no ErrorMsg interface needed).
 func (ctx *Context) HTTPError2(httpCode int, bussCode, userReply string, realMsg error) {
-	resp := &Response{
-		Code:    bussCode,
-		Message: userReply,
-		Data:    nil,
-		Time:    time.Now(),
-		TraceID: ctx.GetTraceID(),
-	}
-	ctx.printRealMsgLog(realMsg.Error())
-	ctx.Gtx.JSON(httpCode, resp)
+	ctx.logRealError(realMsg.Error())
+	ctx.Gtx.JSON(httpCode, ctx.buildResponse(bussCode, userReply, nil))
 }
 
-func (ctx *Context) printRealMsgLog(realMsg string) {
-	msg := realMsgs(realMsg).String()
-	if len(msg) > 0 {
-		ctx.Errorln(msg)
-	}
-}
-
-// HTTPListSuccess if pageData nil or pageData.Results id empty,auto set []
-// http response data or date.results is slice or array
-// default json
+// HTTPListSuccess returns a 200 response with paginated data.
+// If pageData is nil or pageData.Results is nil, Results is set to an empty slice.
 func (ctx *Context) HTTPListSuccess(pageData *PageResults) {
-	emptyPage(pageData)
-	resp := &Response{
-		Code:    successCode,
-		Message: successMsg,
-		Data:    pageData,
-		Time:    time.Now(),
-		TraceID: ctx.GetTraceID(),
-	}
-	ctx.Gtx.JSON(http.StatusOK, resp)
+	ensureResults(pageData)
+	ctx.Gtx.JSON(http.StatusOK, ctx.buildResponse(successCode, successMsg, pageData))
 }
 
-// HTTPListError if pageData nil or pageData.Results id empty,auto set []
-// http response data or date.results is slice or array
-// default json
+// HTTPListError returns a 200 response with a business error and an empty page data.
 func (ctx *Context) HTTPListError(errMsg ErrorMsg) {
-	resp := &Response{
-		Code:    errMsg.GetCode(),
-		Message: errMsg.GetReply(),
-		Data:    defaultEmptyPage,
-		Time:    time.Now(),
-		TraceID: ctx.GetTraceID(),
-	}
-	ctx.printRealMsgLog(errMsg.GetReal())
-	ctx.Gtx.JSON(http.StatusOK, resp)
+	ctx.logRealError(errMsg.GetReal())
+	ctx.Gtx.JSON(http.StatusOK, ctx.buildResponse(errMsg.GetCode(), errMsg.GetReply(), defaultEmptyPage))
 }
 
-func realMsgs(msg string) *realMsg {
-	return &realMsg{
-		Mode: "real_reason",
-		Msg:  msg,
-	}
-}
-
-type realMsg struct {
-	Mode string `json:"mode,omitempty"`
-	Msg  string `json:"msg,omitempty"`
-}
-
-func (m *realMsg) String() string {
-	b, err := json.Marshal(m)
-	if err != nil {
-		return ""
-	}
-	return string(b)
-}
-
-// HTTPListError2 if pageData nil or pageData.Results id empty,auto set []
-// http response data or date.results is slice or array
-// default json
+// HTTPListError2 returns an HTTP error response with the given status code and an empty page data.
 func (ctx *Context) HTTPListError2(httpCode int, errMsg ErrorMsg) {
-	resp := &Response{
-		Code:    errMsg.GetCode(),
-		Message: errMsg.GetReply(),
-		Data:    defaultEmptyPage,
-		Time:    time.Now(),
-		TraceID: ctx.GetTraceID(),
-	}
-	ctx.printRealMsgLog(errMsg.GetReal())
-	ctx.Gtx.JSON(httpCode, resp)
+	ctx.logRealError(errMsg.GetReal())
+	ctx.Gtx.JSON(httpCode, ctx.buildResponse(errMsg.GetCode(), errMsg.GetReply(), defaultEmptyPage))
 }
 
-func emptyPage(pageData *PageResults) {
+// ensureResults sets Results to an empty slice if it is nil, so JSON serializes as [] not null.
+func ensureResults(pageData *PageResults) {
 	if pageData == nil {
 		return
 	}

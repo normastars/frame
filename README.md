@@ -47,6 +47,12 @@ func Hello(c *frame.Context) {
 
 把配置文件放到 `./conf/default.json`（或通过环境变量 `CONFPATH` 指定路径），启动即可。
 
+> 如果使用 Go 1.26+ 在 macOS 上运行，需要加上 `CGO_ENABLED=0`（框架不依赖 cgo）：
+> ```bash
+> CGO_ENABLED=0 go run main.go
+> ```
+> 或直接 `make dev`。
+
 [配置参考 →](docs/1-config.md)
 
 ---
