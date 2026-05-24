@@ -5,7 +5,7 @@ import (
 	"github.com/go-redis/redis/v8"
 	"github.com/imroc/req/v3"
 	"github.com/normastars/frame/cache"
-	"github.com/normastars/frame/core"
+	"github.com/normastars/frame/internal"
 	"github.com/normastars/frame/database"
 	"github.com/normastars/frame/logger"
 	"github.com/sirupsen/logrus"
@@ -40,14 +40,14 @@ type coreApp struct {
 	engine *gin.Engine
 
 	// Optional mock injections (from Functional Options)
-	mockDB    *core.MockDBHolder
+	mockDB    *internal.MockDBHolder
 	mockRedis *redis.Client
 }
 
 // newCoreApp creates a new internal core instance.
 // Does not block on DB/Redis connections; lazy initialized on first use.
-func newCoreApp(config *Config, configManager *ConfigManager, opts ...core.Option) *coreApp {
-	options := &core.Options{}
+func newCoreApp(config *Config, configManager *ConfigManager, opts ...internal.Option) *coreApp {
+	options := &internal.Options{}
 	for _, opt := range opts {
 		opt(options)
 	}
@@ -164,13 +164,13 @@ func (c *coreApp) ensureLegacyRedisConns() {
 }
 
 // convertDBConfigs converts root Config to core package data types
-func convertDBConfigs(config *Config) []core.DBConfig {
+func convertDBConfigs(config *Config) []internal.DBConfig {
 	if !config.Mysql.Enable || len(config.Mysql.Configs) == 0 {
 		return nil
 	}
-	result := make([]core.DBConfig, 0, len(config.Mysql.Configs))
+	result := make([]internal.DBConfig, 0, len(config.Mysql.Configs))
 	for _, v := range config.Mysql.Configs {
-		result = append(result, core.DBConfig{
+		result = append(result, internal.DBConfig{
 			Name:              v.Name,
 			Enable:            v.Enable,
 			EnableAutoMigrate: v.EnableAutoMigrate,
@@ -185,13 +185,13 @@ func convertDBConfigs(config *Config) []core.DBConfig {
 	return result
 }
 
-func convertRedisConfigs(config *Config) []core.RedisConfig {
+func convertRedisConfigs(config *Config) []internal.RedisConfig {
 	if !config.Redis.Enable || len(config.Redis.Configs) == 0 {
 		return nil
 	}
-	result := make([]core.RedisConfig, 0, len(config.Redis.Configs))
+	result := make([]internal.RedisConfig, 0, len(config.Redis.Configs))
 	for _, v := range config.Redis.Configs {
-		result = append(result, core.RedisConfig{
+		result = append(result, internal.RedisConfig{
 			Name:          v.Name,
 			Enable:        v.Enable,
 			Host:          v.Host,

@@ -7,13 +7,13 @@ import (
 
 // frame consts list
 const (
-	TraceIDKey  string = "trace_id"
-	ModeJSON    string = "json"
-	ModelText   string = "text"
-	TraceLogKey string = "req_msg"
+	TraceIDKey  = "trace_id"
+	ModeJSON    = "json"
+	ModeText    = "text" // was ModelText — kept consistent with ModeJSON
+	TraceLogKey = "req_msg"
 )
 
-var (
+const (
 	logLevelTrace = "trace"
 	logLevelDebug = "debug"
 	logLevelInfo  = "info"
@@ -23,7 +23,7 @@ var (
 	logLevelPanic = "panic"
 )
 
-var (
+const (
 	defaultMetricName  = "metric"
 	defaultMetricsName = "metrics"
 	defaultMetricPath  = "/metrics"
@@ -47,36 +47,35 @@ var gormLogm = map[string]logger.LogLevel{
 	logLevelInfo:  logger.Info,
 }
 
-var (
-	codeKey          = "code"
-	msgKey           = "message"
-	successMsg       = "ok"
-	successCode      = "0"
-	defaultEmptyPage = PageResults{
-		Results: make([]interface{}, 0),
-	}
+const (
+	codeKey     = "code"
+	msgKey      = "message"
+	successMsg  = "ok"
+	successCode = "0"
 )
 
+var defaultEmptyPage = PageResults{
+	Results: make([]interface{}, 0),
+}
+
 // config type
-var (
-	configTypeYaml = "yaml"
-	configTypeYal  = "yml"
-	configTypeJSON = "json" // default json
-	configPath     = "CONFPATH"
-	// configType        = "CONFTYPE" // default ./conf/default.json
+const (
+	configTypeYaml    = "yaml"
+	configTypeYal     = "yml"
+	configTypeJSON    = "json" // default json
+	configPath        = "CONFPATH"
 	configDefaultPath = "./conf/default.json"
 )
 
-// TraceLogType trace lo type
+// TraceLogType trace log type
 type TraceLogType string
 
-// trace type
-var (
+const (
 	TraceLogRouter     TraceLogType = "router"
 	TraceLogHTTPClient TraceLogType = "http_client"
 )
 
 var (
-	// configFilePath app config file path
+	// configFilePath app config file path (mutable, set by LoadConfig)
 	configFilePath string
 )

@@ -4,24 +4,30 @@ package database
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/normastars/frame/core"
+	"github.com/normastars/frame/internal"
 	"github.com/sirupsen/logrus"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
+// validDBName enforces a strict allowlist for database names to prevent SQL injection
+// in the CREATE DATABASE statement (which cannot use parameterised queries).
+var validDBName = regexp.MustCompile(`^[A-Za-z0-9_]+$`)
+
 // Dialect defines dialect for mysql
 const Dialect = "mysql"
 
 // Manager manages MySQL connections (instance-level, concurrency-safe)
 type Manager struct {
-	configs   []core.DBConfig
+	configs   []internal.DBConfig
 	clients   map[string]*gorm.DB
 	mu        sync.RWMutex
 	once      sync.Once
@@ -33,7 +39,7 @@ type Manager struct {
 
 // NewManager creates a new MySQL connection manager.
 // Does not connect immediately; initializes lazily on first GetDB call.
-func NewManager(configs []core.DBConfig, logLevel, logMode string, gormLog logger.Interface) *Manager {
+func NewManager(configs []internal.DBConfig, logLevel, logMode string, gormLog logger.Interface) *Manager {
 	return &Manager{
 		configs:  configs,
 		clients:  make(map[string]*gorm.DB),
@@ -68,11 +74,15 @@ func (m *Manager) GetDB(name ...string) *gorm.DB {
 
 // initConnections lazy initializes all database connections.
 // Uses sync.Once to ensure single initialization.
+// The inner loop runs exclusively inside once.Do, so no additional locking is
+// needed while writing to m.clients — the RWMutex is only needed for concurrent
+// reads that happen after initialization completes.
 func (m *Manager) initConnections() {
 	m.once.Do(func() {
 		if len(m.configs) == 0 {
 			return
 		}
+		var errs []error
 		for _, v := range m.configs {
 			if !v.Enable {
 				continue
@@ -80,17 +90,18 @@ func (m *Manager) initConnections() {
 			conn, err := m.open(v)
 			if err != nil {
 				logrus.Errorf("database: failed to connect %s: %v", v.Name, err)
-				m.initErr = err
+				errs = append(errs, err)
 				continue
 			}
-			m.mu.Lock()
 			m.clients[v.Name] = conn
-			m.mu.Unlock()
+		}
+		if len(errs) > 0 {
+			m.initErr = errors.Join(errs...)
 		}
 	})
 }
 
-func (m *Manager) open(item core.DBConfig) (*gorm.DB, error) {
+func (m *Manager) open(item internal.DBConfig) (*gorm.DB, error) {
 	dsn := fmt.Sprintf("%s:%s@(%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		item.User, item.Password, item.Host, item.Database)
 
@@ -128,6 +139,12 @@ func (m *Manager) open(item core.DBConfig) (*gorm.DB, error) {
 }
 
 func createDatabase(user, password, host, database string) error {
+	// Validate the database name against an allowlist before using it in raw SQL.
+	// The CREATE DATABASE statement cannot use parameterised queries, so we
+	// must reject any name that could carry a SQL injection payload.
+	if !validDBName.MatchString(database) {
+		return fmt.Errorf("database: invalid database name %q (only [A-Za-z0-9_] allowed)", database)
+	}
 	db, err := sql.Open(Dialect, fmt.Sprintf("%s:%s@(%s)/", user, password, host))
 	if err != nil {
 		return err

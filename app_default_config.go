@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // Config project config
@@ -35,6 +36,16 @@ type HTTPServer struct {
 	CorsOrigins   []string           `json:"cors_origins" yaml:"cors_origins" mapstructure:"cors_origins"`
 	DisableReqLog bool               `json:"disable_req_log" yaml:"disable_req_log" mapstructure:"disable_req_log"` // default enable
 	Configs       []HTTPServerConfig `json:"configs" yaml:"configs" mapstructure:"configs"`
+
+	// Timeout fields (seconds). Zero or negative means "use framework default".
+	// ReadTimeoutSec  = max time to read the entire request including body (default 15 s).
+	// WriteTimeoutSec = max time to write the response (default 15 s).
+	// IdleTimeoutSec  = max time an idle keep-alive connection is kept open (default 60 s).
+	// ShutdownTimeoutSec = time allowed for in-flight requests to finish on SIGINT/SIGTERM (default 5 s).
+	ReadTimeoutSec     int `json:"read_timeout_sec" yaml:"read_timeout_sec" mapstructure:"read_timeout_sec"`
+	WriteTimeoutSec    int `json:"write_timeout_sec" yaml:"write_timeout_sec" mapstructure:"write_timeout_sec"`
+	IdleTimeoutSec     int `json:"idle_timeout_sec" yaml:"idle_timeout_sec" mapstructure:"idle_timeout_sec"`
+	ShutdownTimeoutSec int `json:"shutdown_timeout_sec" yaml:"shutdown_timeout_sec" mapstructure:"shutdown_timeout_sec"`
 }
 
 // Validate check http server
@@ -43,7 +54,7 @@ func (hs HTTPServer) Validate() []error {
 		return nil
 	}
 	var errs []error
-	if len(hs.Configs) <= 0 {
+	if len(hs.Configs) == 0 {
 		errs = append(errs, errors.New("you enabled http server but didn’t declare the correct httpserver name/port, please set it again"))
 	}
 	for _, v := range hs.Configs {
@@ -57,7 +68,7 @@ func (hs HTTPServer) Validate() []error {
 			errs = append(errs, fmt.Errorf("%s http port can't be set to %s, %s is the default metric port, please reset %s http port", v.Name, defaultMetricPort2, defaultMetricPort, v.Name))
 		}
 	}
-	if len(errs) <= 0 {
+	if len(errs) == 0 {
 		return nil
 	}
 	return errs
@@ -82,7 +93,7 @@ func (tsc HTTPServerConfig) Validate() []error {
 	if port <= 0 || port > 65535 {
 		errs = append(errs, errors.New("please fill in the correct http server port in the configuration file, port range 1 ~ 65535, eg :8080"))
 	}
-	if len(errs) <= 0 {
+	if len(errs) == 0 {
 		return nil
 	}
 	return errs
@@ -101,7 +112,7 @@ func (mc MySQLConfig) Validate() []error {
 		return nil
 	}
 	var errs []error
-	if len(mc.Configs) <= 0 {
+	if len(mc.Configs) == 0 {
 
 		errs = append(errs, errors.New("you enabled mysql service but didn’t declare the correct mysql config, please set it again"))
 	}
@@ -111,7 +122,7 @@ func (mc MySQLConfig) Validate() []error {
 			errs = append(errs, err...)
 		}
 	}
-	if len(errs) <= 0 {
+	if len(errs) == 0 {
 		return nil
 	}
 	return errs
@@ -155,7 +166,7 @@ func (mci MySQLConfigItem) Validate() []error {
 	if mci.Password == "" {
 		errs = append(errs, errors.New("please fill in the correct mysql password in the configuration file, password can't be empty, eg: demo"))
 	}
-	if len(errs) <= 0 {
+	if len(errs) == 0 {
 		return nil
 	}
 	return errs
@@ -174,7 +185,7 @@ func (rc RedisConfig) Validate() []error {
 		return nil
 	}
 	var errs []error
-	if len(rc.Configs) <= 0 {
+	if len(rc.Configs) == 0 {
 		errs = append(errs, errors.New("you enabled redis service but didn’t declare the correct redis config, please set it again"))
 	}
 	for _, v := range rc.Configs {
@@ -208,10 +219,39 @@ func (rci RedisConfigItem) Validate() []error {
 	if rci.Host == "" {
 		errs = append(errs, errors.New("please fill in the correct redis host in the configuration file, host can't be empty, eg: 127.0.0.1:6379"))
 	}
-	if len(errs) <= 0 {
+	if len(errs) == 0 {
 		return nil
 	}
 	return errs
+}
+
+// defaultOrSec returns d when sec is zero/negative, otherwise returns sec seconds.
+// This lets every timeout field be optional in the config file.
+func defaultOrSec(sec int, d time.Duration) time.Duration {
+	if sec > 0 {
+		return time.Duration(sec) * time.Second
+	}
+	return d
+}
+
+// ReadTimeout returns the configured read timeout, falling back to 15 s.
+func (hs HTTPServer) ReadTimeout() time.Duration {
+	return defaultOrSec(hs.ReadTimeoutSec, 15*time.Second)
+}
+
+// WriteTimeout returns the configured write timeout, falling back to 15 s.
+func (hs HTTPServer) WriteTimeout() time.Duration {
+	return defaultOrSec(hs.WriteTimeoutSec, 15*time.Second)
+}
+
+// IdleTimeout returns the configured idle timeout, falling back to 60 s.
+func (hs HTTPServer) IdleTimeout() time.Duration {
+	return defaultOrSec(hs.IdleTimeoutSec, 60*time.Second)
+}
+
+// ShutdownTimeout returns the configured graceful-shutdown window, falling back to 5 s.
+func (hs HTTPServer) ShutdownTimeout() time.Duration {
+	return defaultOrSec(hs.ShutdownTimeoutSec, 5*time.Second)
 }
 
 // getMetricServerConfig return http metric server config
@@ -234,7 +274,7 @@ func (hs HTTPServer) getBusServerConfig() *HTTPServerConfig {
 }
 
 func (c *Config) isEnableMySQLAutoMigrate(dbName string) bool {
-	if len(c.Mysql.Configs) <= 0 {
+	if len(c.Mysql.Configs) == 0 {
 		return false
 	}
 	if !c.Mysql.Enable {
@@ -251,7 +291,7 @@ func (c *Config) isEnableMySQLAutoMigrate(dbName string) bool {
 // Validate validate config
 func (c *Config) validate() []error {
 	var errs []error
-	if len(c.Project) <= 0 {
+	if len(c.Project) == 0 {
 		errs = append(errs, errors.New("please fill in the correct project name in the configuration file, it can't be empty, eg: demo"))
 	}
 	c.LogLevel = strings.ToLower(c.LogLevel)
@@ -260,7 +300,7 @@ func (c *Config) validate() []error {
 	}
 
 	c.LogMode = strings.ToLower(c.LogMode)
-	if !(c.LogMode == ModeJSON || c.LogMode == ModelText) {
+	if !(c.LogMode == ModeJSON || c.LogMode == ModeText) {
 		errs = append(errs, errors.New("please fill in the correct log_mode in the configuration file, choose one of: json/text"))
 	}
 	if c.Env == "" {
@@ -275,7 +315,7 @@ func (c *Config) validate() []error {
 	if err := c.Redis.Validate(); err != nil {
 		errs = append(errs, err...)
 	}
-	if len(errs) <= 0 {
+	if len(errs) == 0 {
 		return nil
 	}
 	return errs
@@ -331,7 +371,7 @@ func (c *Config) getServerPort() string {
 
 func getConfigFromEnv() (t, path string) {
 	path = os.Getenv(configPath)
-	if len(path) <= 0 {
+	if len(path) == 0 {
 		path = configDefaultPath
 	}
 	if strings.HasSuffix(path, configTypeYal) || strings.HasSuffix(path, configTypeYaml) {

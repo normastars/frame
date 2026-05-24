@@ -12,15 +12,25 @@ type Table interface {
 	TableName() string
 }
 
+// globalPreRegistry holds tables registered before frame.New() is called.
+// New() merges it into the coreApp's tableRegistry during startup.
+var globalPreRegistry = newDatabaseTableList()
+
 // RegisterTable registers a table model for auto-migration.
-// Must be called before frame.New() to take effect.
+//
+// It can be called either before or after frame.New():
+//   - Before New(): the table is stored in a package-level pre-registry and
+//     merged into the active App during New().
+//   - After New(): the table is registered directly on the active App.
+//
+// In both cases autoMigrateTables() (called inside New()) applies the migration.
 func RegisterTable(database string, table Table, initfuncs ...TableInitFunc) {
-	core := getActiveCore()
-	if core == nil {
-		logrus.Errorf("RegisterTable: no active app, cannot register table %s", table.TableName())
+	if c := getActiveCore(); c != nil {
+		c.tableRegistry.Add(database, table, initfuncs...)
 		return
 	}
-	core.tableRegistry.Add(database, table, initfuncs...)
+	// No active core yet — buffer in the pre-registry so New() can pick it up.
+	globalPreRegistry.Add(database, table, initfuncs...)
 }
 
 // TableInitFunc is a function called after a table is auto-migrated.
@@ -63,6 +73,17 @@ func (tl *databaseTableList) Add(database string, table Table, initfuncs ...Tabl
 	}
 
 	logrus.Infof("table %s registered to %s successfully", tableName, database)
+}
+
+// MergeFrom copies all entries from other into tl, skipping duplicates.
+// Used by New() to absorb the globalPreRegistry.
+func (tl *databaseTableList) MergeFrom(other *databaseTableList) {
+	tables := other.GetTables()
+	for dbName, tasks := range tables {
+		for _, task := range tasks {
+			tl.Add(dbName, task.Model, task.InitFuncs...)
+		}
+	}
 }
 
 // GetTables returns a defensive copy of all registered tables.

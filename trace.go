@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -15,6 +16,19 @@ import (
 	"github.com/tidwall/gjson"
 	"gorm.io/gorm/logger"
 )
+
+// maxBodyLogBytes is the maximum number of bytes written to the log for any
+// single request or response body. Larger payloads are truncated to prevent
+// sensitive data from flooding logs and to keep log entries bounded in size.
+const maxBodyLogBytes = 2048
+
+// truncateBody caps body strings at maxBodyLogBytes.
+func truncateBody(s string) string {
+	if len(s) <= maxBodyLogBytes {
+		return s
+	}
+	return s[:maxBodyLogBytes] + "...[truncated]"
+}
 
 var defaultJSONLogFormatter = &logrus.JSONFormatter{
 	CallerPrettyfier: func(frame *runtime.Frame) (function string, file string) {
@@ -130,6 +144,13 @@ func LoggerFunc() HandlerFunc {
 		responseBody := w.body.String()
 		httpCode := c.Gtx.Writer.Status()
 
+		// Capture all gin.Context fields BEFORE spawning the goroutine.
+		// gin recycles Context objects after the handler returns, so any
+		// access to c.Gtx inside a goroutine is a data race.
+		queryParams := c.Gtx.Request.URL.Query()
+		pathParams := c.Gtx.Params
+		logEntry := c.Entry
+
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
@@ -162,22 +183,18 @@ func LoggerFunc() HandlerFunc {
 				Path:       url,
 				Extra: reqLogExtra{
 					Req: reqLogBody{
-						QueryParams: c.Gtx.Request.URL.Query(),
-						PathParams:  c.Gtx.Params,
-						Body:        requestBody,
+						QueryParams: queryParams,
+						PathParams:  pathParams,
+						Body:        truncateBody(requestBody),
 					},
 					Resp: respLogBody{
-						Body: responseBody,
+						Body: truncateBody(responseBody),
 					},
 				},
 			}
-			c.WithField(TraceLogKey, reqLog).Info("")
+			logEntry.WithField(TraceLogKey, reqLog).Info("")
 		}()
 	}
-}
-
-func jsonGet(data string, key string) string {
-	return gjson.Get(data, key).String()
 }
 
 func isJSONBody(w gin.ResponseWriter) bool {
@@ -186,13 +203,17 @@ func isJSONBody(w gin.ResponseWriter) bool {
 }
 
 // responseWriter intercepts the response body for logging.
+// mu guards body against concurrent writes (e.g. streaming / SSE handlers).
 type responseWriter struct {
 	gin.ResponseWriter
 	body *bytes.Buffer
+	mu   sync.Mutex
 }
 
 func (w *responseWriter) Write(b []byte) (int, error) {
+	w.mu.Lock()
 	w.body.Write(b)
+	w.mu.Unlock()
 	return w.ResponseWriter.Write(b)
 }
 

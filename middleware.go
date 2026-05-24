@@ -2,7 +2,7 @@ package frame
 
 import "github.com/gin-gonic/gin"
 
-// HandlerFunc freme middleware
+// HandlerFunc frame middleware
 type HandlerFunc func(*Context)
 
 // Use use middleware

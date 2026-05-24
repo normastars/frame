@@ -97,11 +97,11 @@ func requestBody(cr *req.Request) string {
 	return ""
 }
 
-// safeResponseBody returns the response body as a string, empty on error.
+// safeResponseBody returns the response body as a string (truncated to maxBodyLogBytes), empty on error.
 func safeResponseBody(resp *req.Response) string {
 	sbody, err := resp.ToString()
 	if err != nil {
 		return ""
 	}
-	return sbody
+	return truncateBody(sbody)
 }

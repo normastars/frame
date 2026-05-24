@@ -4,16 +4,17 @@ package cache
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/go-redis/redis/v8"
-	"github.com/normastars/frame/core"
+	"github.com/normastars/frame/internal"
 	"github.com/sirupsen/logrus"
 )
 
 // Manager manages Redis connections (instance-level, concurrency-safe)
 type Manager struct {
-	configs []core.RedisConfig
+	configs []internal.RedisConfig
 	clients map[string]*redis.Client
 	mu      sync.RWMutex
 	once    sync.Once
@@ -22,7 +23,7 @@ type Manager struct {
 
 // NewManager creates a new Redis connection manager.
 // Does not connect immediately; initializes lazily on first GetRedis call.
-func NewManager(configs []core.RedisConfig) *Manager {
+func NewManager(configs []internal.RedisConfig) *Manager {
 	return &Manager{
 		configs: configs,
 		clients: make(map[string]*redis.Client),
@@ -52,11 +53,16 @@ func (m *Manager) GetRedis(name ...string) *redis.Client {
 	return m.clients[name[0]]
 }
 
+// initConnections lazy initializes all Redis connections.
+// The closure runs exclusively inside once.Do, so no additional locking is
+// needed while writing to m.clients — the RWMutex is only needed for concurrent
+// reads that happen after initialization completes.
 func (m *Manager) initConnections() {
 	m.once.Do(func() {
 		if len(m.configs) == 0 {
 			return
 		}
+		var errs []error
 		for _, v := range m.configs {
 			if !v.Enable {
 				continue
@@ -64,17 +70,18 @@ func (m *Manager) initConnections() {
 			client, err := m.open(v)
 			if err != nil {
 				logrus.Errorf("cache: failed to connect redis %s: %v", v.Name, err)
-				m.initErr = err
+				errs = append(errs, err)
 				continue
 			}
-			m.mu.Lock()
 			m.clients[v.Name] = client
-			m.mu.Unlock()
+		}
+		if len(errs) > 0 {
+			m.initErr = errors.Join(errs...)
 		}
 	})
 }
 
-func (m *Manager) open(item core.RedisConfig) (*redis.Client, error) {
+func (m *Manager) open(item internal.RedisConfig) (*redis.Client, error) {
 	client := redis.NewClient(&redis.Options{
 		Addr:     item.Host,
 		Password: item.Password,

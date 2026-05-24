@@ -6,39 +6,27 @@ import (
 	"io"
 	"net/http"
 	"os/signal"
-	"sync"
+	"sync/atomic"
 	"syscall"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/imroc/req/v3"
-	"github.com/normastars/frame/core"
+	"github.com/normastars/frame/internal"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
 
-func getConfig(configPath ...string) (*ConfigManager, *Config) {
-	cm, cf := LoadConfig(configPath...)
-	return cm, cf
-}
-
 // activeCore holds the currently active application core instance.
 // Set once during New() call, used only for backward-compatible functions (GetMySQLConn, GetRedisConn, RegisterTable).
-var (
-	activeCore   *coreApp
-	activeCoreMu sync.Mutex
-)
+// atomic.Pointer gives lock-free reads and safe single-writer updates.
+var activeCore atomic.Pointer[coreApp]
 
 func setActiveCore(c *coreApp) {
-	activeCoreMu.Lock()
-	defer activeCoreMu.Unlock()
-	activeCore = c
+	activeCore.Store(c)
 }
 
 func getActiveCore() *coreApp {
-	activeCoreMu.Lock()
-	defer activeCoreMu.Unlock()
-	return activeCore
+	return activeCore.Load()
 }
 
 // App frame engine
@@ -58,25 +46,28 @@ func New(configs ...interface{}) *App {
 	gin.DefaultWriter = io.Discard
 
 	var configPath []string
-	var opts []core.Option
+	var opts []internal.Option
 
 	for _, arg := range configs {
 		switch v := arg.(type) {
 		case string:
 			configPath = append(configPath, v)
-		case core.Option:
+		case internal.Option:
 			opts = append(opts, v)
 		}
 	}
 
 	SetDefaultLog()
-	cm, ac := getConfig(configPath...)
+	cm, ac := LoadConfig(configPath...)
 	logger := NewLogger(ac)
 
 	registerMetrics()
 
 	coreApp := newCoreApp(ac, cm, opts...)
 	setActiveCore(coreApp)
+
+	// Absorb tables that were registered before New() was called.
+	coreApp.tableRegistry.MergeFrom(globalPreRegistry)
 
 	e := &App{
 		Engine: coreApp.engine,
@@ -123,26 +114,38 @@ func (e *App) Run() error {
 		metricServer = e.startMetricServer()
 	}
 
+	hs := e.core.config.HTTPServer
 	srv := &http.Server{
-		Addr:    e.core.config.getServerPort(),
-		Handler: e.Engine,
+		Addr:         e.core.config.getServerPort(),
+		Handler:      e.Engine,
+		ReadTimeout:  hs.ReadTimeout(),
+		WriteTimeout: hs.WriteTimeout(),
+		IdleTimeout:  hs.IdleTimeout(),
 	}
 
+	// srvErr carries startup/listen errors out of the goroutine without
+	// calling os.Exit (which logrus.Fatalf would do, skipping all defers).
+	srvErr := make(chan error, 1)
 	go func() {
 		logrus.Infof("server listen %s\n", srv.Addr)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logrus.Fatalf("server error: %v", err)
+			srvErr <- err
 		}
 	}()
 
 	quit, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	<-quit.Done()
 
-	logrus.Info("shutting down server...")
+	select {
+	case <-quit.Done():
+		logrus.Info("shutting down server...")
+	case err := <-srvErr:
+		logrus.Errorf("server error: %v", err)
+		return err
+	}
 
 	// Use a shared context for shutdown; each Shutdown call is best-effort.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), hs.ShutdownTimeout())
 	defer cancel()
 
 	if err := srv.Shutdown(ctx); err != nil {
@@ -159,13 +162,19 @@ func (e *App) Run() error {
 
 func (e *App) startMetricServer() *http.Server {
 	port := e.core.config.getMetricPort()
+	hs := e.core.config.HTTPServer
 	mux := http.NewServeMux()
 	mux.Handle(defaultMetricPath, promhttp.Handler())
-	srv := &http.Server{Addr: port, Handler: mux}
+	srv := &http.Server{
+		Addr:        port,
+		Handler:     mux,
+		ReadTimeout: hs.ReadTimeout(),
+		IdleTimeout: hs.IdleTimeout(),
+	}
 	go func() {
 		logrus.Infof("%s server listen %s\n", defaultMetricName, port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logrus.Fatalf("metric server error: %v", err)
+			logrus.Errorf("metric server error: %v", err)
 		}
 	}()
 	return srv
@@ -204,8 +213,11 @@ func getHTTPClient(conf *Config, traceID ...string) *req.Client {
 	return rc
 }
 
+// defaultEngine returns a bare gin.Engine with no middleware.
+// gin.Default() bundles its own Logger + Recovery which would duplicate the
+// frame-level LoggerFunc and produce noisy extra log lines.
 func defaultEngine() *gin.Engine {
-	return gin.Default()
+	return gin.New()
 }
 
 // registerRouteWithContext creates a gin handler that builds a frame Context
@@ -230,19 +242,37 @@ func (e *App) createContext(c *gin.Context) *Context {
 	}
 }
 
-// NewContextNoGin returns a context without a gin context (for non-HTTP use cases).
+// NewContextNoGin returns a Context without a gin.Context (for jobs, CLIs, or tests).
+// When called without arguments it reuses the active App's coreApp to avoid
+// creating a duplicate DB/Redis connection pool on every call.
 func NewContextNoGin(configPath ...string) *Context {
-	cm, c := getConfig(configPath...)
+	if len(configPath) == 0 {
+		if c := getActiveCore(); c != nil {
+			traceID := generateTraceID(c.config.Project)
+			return &Context{
+				config:        c.config,
+				configManager: c.configManager,
+				coreApp:       c,
+				traceID:       traceID,
+				Entry:         NewLogger(c.config).WithField(TraceIDKey, traceID),
+				httpClient:    getHTTPClient(c.config, traceID),
+				gormLogger:    c.gormLogger,
+				redisHook:     c.redisHook,
+			}
+		}
+	}
+	cm, c := LoadConfig(configPath...)
 	traceID := generateTraceID(c.Project)
-	core := newCoreApp(c, cm)
+	ca := newCoreApp(c, cm)
 	return &Context{
 		config:        c,
 		configManager: cm,
-		coreApp:       core,
+		coreApp:       ca,
+		traceID:       traceID,
 		Entry:         NewLogger(c).WithField(TraceIDKey, traceID),
 		httpClient:    getHTTPClient(c, traceID),
-		gormLogger:    core.gormLogger,
-		redisHook:     core.redisHook,
+		gormLogger:    ca.gormLogger,
+		redisHook:     ca.redisHook,
 	}
 }
 

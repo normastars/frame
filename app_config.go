@@ -27,7 +27,7 @@ func NewConfigManager(configPath string) (*ConfigManager, error) {
 // ReadConfigObject read config
 // add `mapstructure:"key"` tag
 func (cm *ConfigManager) ReadConfigObject(obj interface{}) error {
-	if !(cm.Viper != nil) {
+	if cm.Viper == nil {
 		return fmt.Errorf("config manager is nil")
 	}
 	if err := cm.Unmarshal(obj); err != nil {

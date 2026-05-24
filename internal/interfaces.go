@@ -1,6 +1,6 @@
 // Package core provides core internal interfaces and data types for the frame framework.
 // All interfaces are unexported (lowercase). External users only need to import the frame root package.
-package core
+package internal
 
 import "gorm.io/gorm"
 
