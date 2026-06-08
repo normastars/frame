@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"github.com/normastars/frame"
 	"github.com/normastars/frame/example/version"
 )
@@ -33,14 +32,11 @@ func main() {
 	app.PATCH("/user/:id", PatchUser)
 	app.HEAD("/health", HealthCheck)
 
-	// ── Route group with gin-level middleware ─────────────────────
-	// app.Group() returns *gin.RouterGroup, so middleware and
-	// handlers use gin.HandlerFunc. Use the frame-compatible wrapper
-	// convert2Gin or register via app.Use() for global middlewares.
+	// ── Route group ───────────────────────────────────────────────
 	v1 := app.Group("/api/v1")
 	{
-		v1.GET("/items", wrap(ListItems))
-		v1.POST("/items", wrap(CreateItem))
+		v1.GET("/items", ListItems)
+		v1.POST("/items", CreateItem)
 	}
 
 	// Startup info
@@ -49,13 +45,6 @@ func main() {
 	fmt.Printf("system: %20s\n", version.BuildSystem)
 
 	app.Run()
-}
-
-// wrap converts a frame.HandlerFunc to gin.HandlerFunc for use on sub-groups.
-func wrap(h frame.HandlerFunc) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		h(&frame.Context{Gtx: c})
-	}
 }
 
 // ── Handlers ─────────────────────────────────────────────────────

@@ -185,15 +185,6 @@ func (e *App) getTraceID(c *gin.Context) string {
 	return c.GetHeader(TraceIDKey)
 }
 
-func (e *App) getLogEntry(c *gin.Context) *logrus.Entry {
-	return e.log.WithField(TraceIDKey, e.getTraceID(c))
-}
-
-func (e *App) getHTTPClient(c *gin.Context) *req.Client {
-	traceID := e.getTraceID(c)
-	return e.core.baseHTTPClient.SetCommonHeader(TraceIDKey, traceID)
-}
-
 // getHTTPClient creates an HTTP client for non-Gin contexts.
 func getHTTPClient(conf *Config, traceID ...string) *req.Client {
 	tid := ""
@@ -304,6 +295,21 @@ func (e *App) DELETE(relativePath string, handler func(c *Context)) {
 // HEAD registers a HEAD route.
 func (e *App) HEAD(relativePath string, handler func(c *Context)) {
 	e.Engine.HEAD(relativePath, e.registerRouteWithContext(handler))
+}
+
+// Group creates a route group with optional frame-compatible middleware.
+// Handlers registered on the returned RouterGroup receive a full Context
+// (config, DB, Redis, HTTP client, logging) — unlike the raw gin.RouterGroup
+// returned by the embedded Engine.Group().
+func (e *App) Group(relativePath string, handlers ...HandlerFunc) *RouterGroup {
+	ginHandlers := make([]gin.HandlerFunc, len(handlers))
+	for i, h := range handlers {
+		ginHandlers[i] = e.convert2GinHandlerFunc(h)
+	}
+	return &RouterGroup{
+		app: e,
+		rg:  e.Engine.Group(relativePath, ginHandlers...),
+	}
 }
 
 func getTraceIDFromContext(ctx context.Context) string {

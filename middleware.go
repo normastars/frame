@@ -15,16 +15,7 @@ func (e *App) Use(middleware ...HandlerFunc) {
 }
 
 func (e *App) convert2FrameContext(c *gin.Context) *Context {
-	return &Context{
-		Gtx:           c,
-		config:        e.core.config,
-		configManager: e.core.configManager,
-		coreApp:       e.core,
-		Entry:         e.getLogEntry(c),
-		httpClient:    e.getHTTPClient(c),
-		gormLogger:    e.core.gormLogger,
-		redisHook:     e.core.redisHook,
-	}
+	return e.createContext(c)
 }
 
 func (e *App) convert2GinHandlerFunc(h HandlerFunc) gin.HandlerFunc {
