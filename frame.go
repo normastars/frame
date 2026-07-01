@@ -227,7 +227,7 @@ func (e *App) createContext(c *gin.Context) *Context {
 		configManager: e.core.configManager,
 		coreApp:       e.core,
 		Entry:         e.log.WithField(TraceIDKey, traceID),
-		httpClient:    e.core.baseHTTPClient.SetCommonHeader(TraceIDKey, traceID),
+		httpClient:    e.core.baseHTTPClient.Clone().SetCommonHeader(TraceIDKey, traceID),
 		gormLogger:    e.core.gormLogger,
 		redisHook:     e.core.redisHook,
 	}
